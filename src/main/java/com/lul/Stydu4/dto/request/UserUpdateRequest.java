@@ -1,43 +1,18 @@
 package com.lul.Stydu4.dto.request;
 
+import lombok.*;
+
 import java.time.LocalDate;
 
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class UserUpdateRequest {
     private String firstName;
     private String lastName;
     private String password;
     private LocalDate dob;
 
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public LocalDate getDob() {
-        return dob;
-    }
-
-    public void setDob(LocalDate dob) {
-        this.dob = dob;
-    }
 }

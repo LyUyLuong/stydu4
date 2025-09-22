@@ -1,7 +1,9 @@
-package com.lul.Stydu4.dto.request;
+package com.lul.Stydu4.dto.response;
 
-import jakarta.validation.constraints.Size;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
@@ -9,14 +11,12 @@ import java.time.LocalDate;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserCreationRequest {
+public class UserResponse {
 
-    @Size(min = 5,message = "USERNAME_INVALID")
+    private String id;
     private String username;
     private String firstName;
     private String lastName;
-
-    @Size(min = 6, message = "INVALID_PASSWORD")
     private String password;
     private LocalDate dob;
 

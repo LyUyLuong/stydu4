@@ -5,6 +5,7 @@ import com.lul.Stydu4.dto.request.UserUpdateRequest;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.exception.AppException;
+import com.lul.Stydu4.mapper.UserMapper;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,24 +17,21 @@ import java.util.List;
 public class UserService implements IUserService {
 
     private final IUserRepository userRepository;
+    private final UserMapper userMapper;
 
     @Autowired
-    public UserService(IUserRepository userRepository) {
+    public UserService(IUserRepository userRepository, UserMapper userMapper) {
         this.userRepository = userRepository;
+        this.userMapper = userMapper;
     }
 
     @Override
     public UserEntity createUser(UserCreationRequest userCreationRequest) {
-        UserEntity userEntity = new UserEntity();
 
         if (userRepository.existsByUsername(userCreationRequest.getUsername()))
             throw new AppException(ErrorCode.USER_EXISTED);
 
-        userEntity.setUsername(userCreationRequest.getUsername());
-        userEntity.setPassword(userCreationRequest.getPassword());
-        userEntity.setFirstName(userCreationRequest.getFirstName());
-        userEntity.setLastName(userCreationRequest.getLastName());
-        userEntity.setDob(userCreationRequest.getDob());
+        UserEntity userEntity = userMapper.toUserEntity(userCreationRequest);
 
         return userRepository.save(userEntity);
     }
@@ -41,11 +39,8 @@ public class UserService implements IUserService {
     @Override
     public UserEntity updateUser(String id, UserUpdateRequest userUpdateRequest) {
         UserEntity userEntity = getUserById(id);
+        userMapper.updateUserEntity(userEntity, userUpdateRequest);
 
-        userEntity.setFirstName(userUpdateRequest.getFirstName());
-        userEntity.setLastName(userUpdateRequest.getLastName());
-        userEntity.setPassword(userUpdateRequest.getPassword());
-        userEntity.setDob(userUpdateRequest.getDob());
         return userRepository.save(userEntity);
     }
 
