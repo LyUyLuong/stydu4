@@ -6,12 +6,12 @@ import java.time.LocalDate;
 
 public class UserCreationRequest {
 
-    @Size(min = 5,message = "Username must be at least 5 characters")
+    @Size(min = 5,message = "USERNAME_INVALID")
     private String username;
     private String firstName;
     private String lastName;
 
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @Size(min = 6, message = "INVALID_PASSWORD")
     private String password;
     private LocalDate dob;
 

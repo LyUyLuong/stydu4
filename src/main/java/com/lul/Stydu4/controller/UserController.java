@@ -2,6 +2,7 @@ package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.request.UserCreationRequest;
 import com.lul.Stydu4.dto.request.UserUpdateRequest;
+import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.service.IUserService;
 import com.lul.Stydu4.service.impl.UserService;
@@ -22,8 +23,12 @@ public class UserController {
 
 
     @PostMapping
-    UserEntity createUser(@RequestBody @Valid UserCreationRequest request){
-        return userService.createUser(request);
+    ApiResponse<UserEntity> createUser(@RequestBody @Valid UserCreationRequest request){
+
+        ApiResponse<UserEntity> apiResponse = new ApiResponse<>();
+        apiResponse.setResult(userService.createUser(request));
+
+        return apiResponse;
     }
 
     @GetMapping

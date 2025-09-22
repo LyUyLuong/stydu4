@@ -3,6 +3,8 @@ package com.lul.Stydu4.service.impl;
 import com.lul.Stydu4.dto.request.UserCreationRequest;
 import com.lul.Stydu4.dto.request.UserUpdateRequest;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +27,7 @@ public class UserService implements IUserService {
         UserEntity userEntity = new UserEntity();
 
         if (userRepository.existsByUsername(userCreationRequest.getUsername()))
-            throw new RuntimeException("User existed.");
+            throw new AppException(ErrorCode.USER_EXISTED);
 
         userEntity.setUsername(userCreationRequest.getUsername());
         userEntity.setPassword(userCreationRequest.getPassword());
@@ -49,7 +51,7 @@ public class UserService implements IUserService {
 
     @Override
     public UserEntity getUserById(String id) {
-        return userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     @Override
