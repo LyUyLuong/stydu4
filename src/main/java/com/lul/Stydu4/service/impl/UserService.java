@@ -23,6 +23,10 @@ public class UserService implements IUserService {
     @Override
     public UserEntity createUser(UserCreationRequest userCreationRequest) {
         UserEntity userEntity = new UserEntity();
+
+        if (userRepository.existsByUsername(userCreationRequest.getUsername()))
+            throw new RuntimeException("User existed.");
+
         userEntity.setUsername(userCreationRequest.getUsername());
         userEntity.setPassword(userCreationRequest.getPassword());
         userEntity.setFirstName(userCreationRequest.getFirstName());

@@ -5,6 +5,7 @@ import com.lul.Stydu4.dto.request.UserUpdateRequest;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.service.IUserService;
 import com.lul.Stydu4.service.impl.UserService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public class UserController {
 
 
     @PostMapping
-    UserEntity createUser(@RequestBody UserCreationRequest request){
+    UserEntity createUser(@RequestBody @Valid UserCreationRequest request){
         return userService.createUser(request);
     }
 

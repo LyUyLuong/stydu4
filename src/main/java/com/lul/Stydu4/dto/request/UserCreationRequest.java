@@ -1,11 +1,17 @@
 package com.lul.Stydu4.dto.request;
 
+import jakarta.validation.constraints.Size;
+
 import java.time.LocalDate;
 
 public class UserCreationRequest {
+
+    @Size(min = 5,message = "Username must be at least 5 characters")
     private String username;
     private String firstName;
     private String lastName;
+
+    @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
     private LocalDate dob;
 
