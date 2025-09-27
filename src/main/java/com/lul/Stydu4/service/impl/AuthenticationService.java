@@ -15,7 +15,9 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +36,7 @@ import java.util.StringJoiner;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationService implements IAuthenticationService {
 
     @NonFinal
@@ -106,9 +109,9 @@ public class AuthenticationService implements IAuthenticationService {
     @Override
     public String buildScope(UserEntity user){
         StringJoiner stringJoiner = new StringJoiner(" ");
-        if(!CollectionUtils.isEmpty(user.getRoles())){
-            user.getRoles().forEach(stringJoiner::add);
-        }
+//        if(!CollectionUtils.isEmpty(user.getRoles())){
+//            user.getRoles().forEach(stringJoiner::add);
+//        }
         return stringJoiner.toString();
     }
 }

@@ -11,6 +11,8 @@ import com.lul.Stydu4.mapper.UserMapper;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PostAuthorize;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,7 +45,7 @@ public class UserService implements IUserService {
 
         HashSet<String> roles = new HashSet<>();
         roles.add(Role.USER.name());
-        userEntity.setRoles(roles);
+//        userEntity.setRoles(roles);
 
         userEntity.setPassword(passwordEncoder.encode(userCreationRequest.getPassword()));
 
@@ -68,12 +70,16 @@ public class UserService implements IUserService {
         userRepository.deleteById(id);
     }
 
+
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream().map(userMapper::toUserResponse).toList();
     }
 
+
     @Override
+    @PostAuthorize("returnObject.username == authentication.name")
     public UserResponse getMyInfo() {
         UserEntity user = userRepository.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 

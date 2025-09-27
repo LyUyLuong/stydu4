@@ -1,9 +1,6 @@
 package com.lul.Stydu4.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -27,7 +24,13 @@ public class UserEntity {
     private String password;
     private LocalDate dob;
 
-    private Set<String> roles;
+    @ManyToMany
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_name")
+    )
+    private Set<RoleEntity> roles;
 
 
 }

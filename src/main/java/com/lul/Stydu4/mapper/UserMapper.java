@@ -8,6 +8,7 @@ import com.lul.Stydu4.entity.UserEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 
+//@Mapper(componentModel = "spring", uses = RoleMapper.class)
 @Mapper(componentModel = "spring")
 public interface UserMapper {
 

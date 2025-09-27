@@ -7,6 +7,7 @@ import com.lul.Stydu4.entity.UserEntity;
 
 import java.util.List;
 
+
 public interface IUserService {
     UserResponse createUser(UserCreationRequest userCreationRequest);
     UserResponse updateUser(String id, UserUpdateRequest userUpdateRequest);

@@ -22,6 +22,7 @@ import java.text.ParseException;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationController {
+
     IAuthenticationService authenticationService;
 
     @PostMapping("/token")
