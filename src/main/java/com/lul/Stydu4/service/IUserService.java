@@ -13,4 +13,5 @@ public interface IUserService {
     UserResponse getUserById(String id);
     void deleteUser(String id);
     List<UserResponse> getAllUsers();
+    UserResponse getMyInfo();
 }

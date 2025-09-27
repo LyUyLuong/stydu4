@@ -5,15 +5,18 @@ import com.lul.Stydu4.dto.request.UserUpdateRequest;
 import com.lul.Stydu4.dto.response.UserResponse;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.Role;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.UserMapper;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 
 @Service
@@ -21,11 +24,13 @@ public class UserService implements IUserService {
 
     private final IUserRepository userRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public UserService(IUserRepository userRepository, UserMapper userMapper) {
+    public UserService(IUserRepository userRepository, UserMapper userMapper, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -35,7 +40,11 @@ public class UserService implements IUserService {
             throw new AppException(ErrorCode.USER_EXISTED);
 
         UserEntity userEntity = userMapper.toUserEntity(userCreationRequest);
-        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
+
+        HashSet<String> roles = new HashSet<>();
+        roles.add(Role.USER.name());
+        userEntity.setRoles(roles);
+
         userEntity.setPassword(passwordEncoder.encode(userCreationRequest.getPassword()));
 
         return userMapper.toUserResponse(userRepository.save(userEntity));
@@ -62,5 +71,12 @@ public class UserService implements IUserService {
     @Override
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream().map(userMapper::toUserResponse).toList();
+    }
+
+    @Override
+    public UserResponse getMyInfo() {
+        UserEntity user = userRepository.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        return userMapper.toUserResponse(user);
     }
 }
