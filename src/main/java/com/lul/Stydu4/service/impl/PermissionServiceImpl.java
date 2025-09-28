@@ -7,7 +7,6 @@ import com.lul.Stydu4.mapper.PermissionMapper;
 import com.lul.Stydu4.repository.IPermissionRepository;
 import com.lul.Stydu4.service.IPermissionService;
 import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class PermissionService implements IPermissionService {
+public class PermissionServiceImpl implements IPermissionService {
 
     IPermissionRepository permissionRepository;
     PermissionMapper permissionMapper;

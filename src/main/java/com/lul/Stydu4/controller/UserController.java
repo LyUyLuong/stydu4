@@ -4,15 +4,12 @@ import com.lul.Stydu4.dto.request.UserCreationRequest;
 import com.lul.Stydu4.dto.request.UserUpdateRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.UserResponse;
-import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.service.IUserService;
-import com.lul.Stydu4.service.impl.UserService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

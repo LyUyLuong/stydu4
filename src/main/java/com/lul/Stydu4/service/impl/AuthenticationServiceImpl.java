@@ -29,7 +29,6 @@ import org.springframework.util.CollectionUtils;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.Date;
 import java.util.StringJoiner;
 
@@ -37,7 +36,7 @@ import java.util.StringJoiner;
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class AuthenticationService implements IAuthenticationService {
+public class AuthenticationServiceImpl implements IAuthenticationService {
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -109,9 +108,19 @@ public class AuthenticationService implements IAuthenticationService {
     @Override
     public String buildScope(UserEntity user){
         StringJoiner stringJoiner = new StringJoiner(" ");
-//        if(!CollectionUtils.isEmpty(user.getRoles())){
-//            user.getRoles().forEach(stringJoiner::add);
-//        }
+
+        if(!CollectionUtils.isEmpty(user.getRoles())){
+            user.getRoles().forEach(roleEntity -> {
+                stringJoiner.add("ROLE_"+roleEntity.getName());
+                if(!CollectionUtils.isEmpty(roleEntity.getPermissions())){
+                    roleEntity.getPermissions().forEach(permissionEntity -> {
+                        stringJoiner.add(permissionEntity.getName());
+                    });
+                }
+            });
+        }
+
+        log.warn(stringJoiner.toString());
         return stringJoiner.toString();
     }
 }
