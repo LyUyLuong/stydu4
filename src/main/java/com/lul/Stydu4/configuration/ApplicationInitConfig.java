@@ -1,6 +1,7 @@
 package com.lul.Stydu4.configuration;
 
 
+import com.lul.Stydu4.entity.RoleEntity;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.Role;
 import com.lul.Stydu4.repository.IUserRepository;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.HashSet;
+import java.util.Set;
 
 @Configuration
 @Slf4j
@@ -29,13 +31,13 @@ public class ApplicationInitConfig {
         return args -> {
             if(userRepository.findByUsername("admin").isEmpty()){
 
-                HashSet<String> roles = new HashSet<>();
+                Set<RoleEntity> roles = new HashSet<>();
                 roles.add(Role.ADMIN.name());
 
                 UserEntity admin = UserEntity.builder()
                         .username("admin")
                         .password(passwordEncoder.encode("admin"))
-//                        .roles(roles)
+                        .roles(roles)
                         .build();
 
                 userRepository.save(admin);
