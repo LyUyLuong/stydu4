@@ -2,6 +2,7 @@ package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.dto.request.AuthenticationRequest;
 import com.lul.Stydu4.dto.request.IntrospectRequest;
+import com.lul.Stydu4.dto.request.LogoutRequest;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
 import com.lul.Stydu4.entity.UserEntity;
@@ -10,6 +11,7 @@ import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.UserMapper;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IAuthenticationService;
+import com.lul.Stydu4.service.IJwtBlacklistService;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -31,6 +33,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -42,8 +45,10 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
 
-    private final IUserRepository userRepository;
-    private final UserMapper userMapper;
+    IUserRepository userRepository;
+    UserMapper userMapper;
+    IJwtBlacklistService jwtBlacklistService;
+
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
@@ -66,15 +71,16 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     public IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException {
         String token = request.getToken();
 
-        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
-        SignedJWT signedJWT = SignedJWT.parse(token);
+        boolean isValid = true;
 
-        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
-
-        Boolean isAuthenticated =  signedJWT.verify(verifier);
+        try {
+            verify(token);
+        } catch (AppException e) {
+            isValid = false;
+        }
 
         return IntrospectResponse.builder()
-                .valid(isAuthenticated && expiryTime.after(new Date()))
+                .valid(isValid)
                 .build();
 
     }
@@ -90,6 +96,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
                 .claim("scope", buildScope(user))
+                .jwtID(UUID.randomUUID().toString())
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -122,5 +129,39 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         log.warn(stringJoiner.toString());
         return stringJoiner.toString();
+    }
+
+    @Override
+    public void logout(LogoutRequest request) throws ParseException, JOSEException {
+        SignedJWT token = verify(request.getToken());
+
+        String jit = token.getJWTClaimsSet().getJWTID();
+        Date expirationTime = token.getJWTClaimsSet().getExpirationTime();
+
+        long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000; // Tính TTL còn lại
+        if (ttl > 0) {
+            jwtBlacklistService.blacklistToken(jit, ttl);
+        }
+    }
+
+    private SignedJWT verify(String token) throws JOSEException, ParseException {
+
+        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+
+        SignedJWT signedJWT = SignedJWT.parse(token);
+
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        boolean isAuthenticated =  signedJWT.verify(verifier);
+
+        if(!isAuthenticated && expiryTime.after(new Date())){
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        if (jwtBlacklistService.isTokenBlacklisted(signedJWT.getJWTClaimsSet().getJWTID()))
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+
+        return signedJWT;
+
     }
 }

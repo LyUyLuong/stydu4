@@ -2,6 +2,7 @@ package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.request.AuthenticationRequest;
 import com.lul.Stydu4.dto.request.IntrospectRequest;
+import com.lul.Stydu4.dto.request.LogoutRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
@@ -42,6 +43,14 @@ public class AuthenticationController {
         var result = authenticationService.introspect(request);
         return ApiResponse.<IntrospectResponse>builder()
                 .result(result)
+                .build();
+    }
+
+    @PostMapping("/logout")
+    ApiResponse<Void> logout(@RequestBody LogoutRequest request) throws ParseException, JOSEException {
+        authenticationService.logout(request);
+        return ApiResponse.<Void>builder()
+                .result(null)
                 .build();
     }
 }

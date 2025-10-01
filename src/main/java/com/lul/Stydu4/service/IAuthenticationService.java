@@ -2,6 +2,7 @@ package com.lul.Stydu4.service;
 
 import com.lul.Stydu4.dto.request.AuthenticationRequest;
 import com.lul.Stydu4.dto.request.IntrospectRequest;
+import com.lul.Stydu4.dto.request.LogoutRequest;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
 import com.lul.Stydu4.entity.UserEntity;
@@ -14,4 +15,5 @@ public interface IAuthenticationService {
     IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException;
     String generateToken(UserEntity user);
     String buildScope(UserEntity user);
+    void logout(LogoutRequest request) throws ParseException, JOSEException;
 }

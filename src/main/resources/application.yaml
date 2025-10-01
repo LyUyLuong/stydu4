@@ -18,6 +18,11 @@ spring:
     properties:
         format_sql: true
     show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
 jwt:
   signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
 
