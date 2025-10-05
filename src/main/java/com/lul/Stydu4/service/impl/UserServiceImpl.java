@@ -47,9 +47,10 @@ public class UserServiceImpl implements IUserService {
 
         UserEntity userEntity = userMapper.toUserEntity(userCreationRequest);
 
-        HashSet<String> roles = new HashSet<>();
-        roles.add(Role.USER.name());
-//        userEntity.setRoles(roles);
+        HashSet<RoleEntity> roles = new HashSet<>();
+        RoleEntity usrRole = roleRepository.findById(Role.ADMIN.name()).orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+        roles.add(usrRole);
+        userEntity.setRoles(roles);
 
         userEntity.setPassword(passwordEncoder.encode(userCreationRequest.getPassword()));
 
