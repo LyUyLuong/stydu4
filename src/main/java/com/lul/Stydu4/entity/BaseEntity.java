@@ -14,23 +14,25 @@ import java.util.Date;
 
 
 @MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
-public class BaseEntity implements Serializable {
+@EntityListeners(org.springframework.data.jpa.domain.support.AuditingEntityListener.class)
+public abstract class BaseEntity implements java.io.Serializable {
 
-    @Column(name = "createddate")
-    @CreatedDate
-    private Date createdDate;
+    @org.springframework.data.annotation.CreatedDate
+    @jakarta.persistence.Column(name = "createddate", updatable = false)
+    private java.time.LocalDateTime createdDate;
 
-    @Column(name = "createdby")
-    @CreatedBy
+    @org.springframework.data.annotation.CreatedBy
+    @jakarta.persistence.Column(name = "createdby", updatable = false)
     private String createdBy;
 
-    @Column(name = "modifieddate")
-    @LastModifiedDate
-    private Date modifiedDate;
+    @org.springframework.data.annotation.LastModifiedDate
+    @jakarta.persistence.Column(name = "modifieddate")
+    private java.time.LocalDateTime modifiedDate;
 
-    @Column(name = "modifiedby")
-    @LastModifiedBy
+    @org.springframework.data.annotation.LastModifiedBy
+    @jakarta.persistence.Column(name = "modifiedby")
     private String modifiedBy;
 
+    // getters/setters...
 }
+

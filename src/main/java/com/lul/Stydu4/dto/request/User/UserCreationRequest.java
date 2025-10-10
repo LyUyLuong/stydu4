@@ -1,4 +1,4 @@
-package com.lul.Stydu4.dto.request;
+package com.lul.Stydu4.dto.request.User;
 
 import jakarta.validation.constraints.Size;
 import lombok.*;

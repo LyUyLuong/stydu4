@@ -1,7 +1,7 @@
 package com.lul.Stydu4.service.impl;
 
-import com.lul.Stydu4.dto.request.UserCreationRequest;
-import com.lul.Stydu4.dto.request.UserUpdateRequest;
+import com.lul.Stydu4.dto.request.User.UserCreationRequest;
+import com.lul.Stydu4.dto.request.User.UserUpdateRequest;
 import com.lul.Stydu4.dto.response.UserResponse;
 import com.lul.Stydu4.entity.RoleEntity;
 import com.lul.Stydu4.entity.UserEntity;

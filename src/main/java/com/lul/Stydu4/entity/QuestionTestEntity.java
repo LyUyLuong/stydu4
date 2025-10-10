@@ -1,14 +1,13 @@
 package com.lul.Stydu4.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
@@ -24,6 +23,7 @@ public class QuestionTestEntity extends BaseEntity{
     private String type;
     private String audioPath;
     private String image;
+    private String description;
 
 
     @ManyToOne
@@ -34,7 +34,10 @@ public class QuestionTestEntity extends BaseEntity{
     @JoinColumn(name = "question_group_id")
     private QuestionGroupEntity questionGroupEntity;
 
-    @OneToMany(mappedBy = "question")
-    private List<AnswerEntity> answers;
+    // QuestionTestEntity (sửa)
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AnswerEntity> answers = new ArrayList<>();
+
 
 }

@@ -3,14 +3,12 @@ package com.lul.Stydu4.entity;
 
 import com.lul.Stydu4.enums.TestType;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
@@ -35,9 +33,9 @@ public class TestEntity extends BaseEntity{
     @OneToMany(mappedBy = "testEntity")
     private List<PartTestEntity> partTestEntities;
 
-//    ko can thiet
-//    @OneToMany(mappedBy = "test")
-//    private List<ResultEntity> resultEntities;
 
 
 }
+//    ko can thiet
+//    @OneToMany(mappedBy = "test")
+//    private List<ResultEntity> resultEntities;
