@@ -17,6 +17,7 @@ public interface PartTestMapper {
     @Mapping(target = "questions", ignore = true)
     @Mapping(target = "questionGroups", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "type", ignore = true)
     PartTestEntity toPartTestEntity(PartTestCreationRequest request);
 
 
@@ -24,6 +25,7 @@ public interface PartTestMapper {
     @Mapping(target = "questions", ignore = true)
     @Mapping(target = "questionGroups", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "type", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updatePartTestEntityFromRequest(PartTestUpdateRequest request, @MappingTarget PartTestEntity entity);
 

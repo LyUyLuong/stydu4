@@ -8,6 +8,7 @@ import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
 import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.TestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.PartType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.PartTestMapper;
 import com.lul.Stydu4.repository.IPartTestRepository;
@@ -24,7 +25,8 @@ import org.springframework.stereotype.Service;
 
 
 import java.util.List;
-import java.util.Optional;
+
+import static com.lul.Stydu4.util.EnumValidator.validateAndConvert;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,13 @@ public class PartTestServiceImpl implements IPartTestService {
         // Map basic fields
         PartTestEntity entity = partTestMapper.toPartTestEntity(request);
 
+        PartType partType = validateAndConvert(
+                request.getType(),
+                PartType.class,
+                ErrorCode.INVALID_PART_TYPE
+        );
+        entity.setType(partType);
+
         // Gán testEntity nếu testId hợp lệ
         if (request.getTestId() != null) {
             TestEntity test = testRepository.findById(request.getTestId())
@@ -52,12 +61,20 @@ public class PartTestServiceImpl implements IPartTestService {
 
     @Override
     public PartTestDetailResponse update(String partTestID, PartTestUpdateRequest request) {
-        Optional<PartTestEntity> optional = partTestRepository.findById(partTestID);
-        if (optional.isEmpty()) {
-            throw new RuntimeException("PartTest not found with id: " + partTestID);
+        PartTestEntity existing = partTestRepository.findById(partTestID).orElseThrow(
+                () -> new AppException(ErrorCode.PART_TEST_NOT_FOUND)
+        );
+
+        if (request.getType() != null) {
+            PartType partType = validateAndConvert(
+                    request.getType(),
+                    PartType.class,
+                    ErrorCode.INVALID_PART_TYPE
+            );
+            existing.setType(partType);
         }
 
-        PartTestEntity existing = optional.get();
+
         partTestMapper.updatePartTestEntityFromRequest(request, existing);
         return partTestMapper.toPartTestResponse(partTestRepository.save(existing));
     }

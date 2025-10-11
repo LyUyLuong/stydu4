@@ -1,6 +1,7 @@
 package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.request.Test.TestCreationRequest;
+import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
 import com.lul.Stydu4.dto.request.Test.TestUpdateRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.PageResponse;
@@ -12,6 +13,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,6 +42,16 @@ public class TestController {
                 .result(testService.getAllTests(page, size))
                 .build();
     }
+
+
+    @GetMapping("/search-with-specification")
+    ApiResponse<PageResponse<TestSummaryResponse>> getTestsBySpecification(@ModelAttribute @Valid TestSearchRequest request,
+                                                                           Pageable pageable) {
+        return ApiResponse.<PageResponse<TestSummaryResponse>>builder()
+                .result(testService.searchTests(request,pageable))
+                .build();
+    }
+
 
     @GetMapping("/{testId}")
     ApiResponse<TestDetailResponse> getTest(@PathVariable String testId) {

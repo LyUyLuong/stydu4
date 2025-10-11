@@ -15,11 +15,13 @@ public interface TestMapper {
 
     @Mapping(target = "partTestEntities", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "type", ignore = true)
     TestEntity toTestEntity(TestCreationRequest request);
 
 
     @Mapping(target = "partTestEntities", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "type", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateTestEntityFromRequest(TestUpdateRequest request, @MappingTarget TestEntity entity);
 

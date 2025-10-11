@@ -16,9 +16,14 @@ public enum ErrorCode {
 
     //TestErrorCode
     TEST_NOT_FOUND(1008, "Test not found",HttpStatus.NOT_FOUND),
+    INVALID_TEST_TYPE(1009, "Invalid test type", HttpStatus.BAD_REQUEST),
 
     //PartTestErrorCode
-    PART_TEST_NOT_FOUND(1009, "Part test not found",HttpStatus.NOT_FOUND),
+    PART_TEST_NOT_FOUND(1010, "Part test not found",HttpStatus.NOT_FOUND),
+    INVALID_PART_TYPE(1014, "Invalid part type", HttpStatus.BAD_REQUEST),
+
+    // Role ErrorCode
+    INVALID_ROLE(1013, "Invalid role", HttpStatus.BAD_REQUEST),
 
     ;
 

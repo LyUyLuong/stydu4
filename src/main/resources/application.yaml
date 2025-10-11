@@ -25,5 +25,10 @@ spring:
       database: 0
 jwt:
   signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
-
+logging:
+  level:
+    com.lul.Stydu4: DEBUG
+    com.lul.Stydu4.exception: DEBUG
+    com.lul.Stydu4.converter: DEBUG
+    org.springframework.web: DEBUG
 

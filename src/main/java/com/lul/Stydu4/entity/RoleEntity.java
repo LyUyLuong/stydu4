@@ -1,33 +1,33 @@
 package com.lul.Stydu4.entity;
 
-
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.HashSet;
 import java.util.Set;
 
-@Data
+@Entity
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)  // CHỈ dùng field có @Include
+@ToString(exclude = "permissions")  // Exclude lazy collection khỏi toString
 public class RoleEntity {
 
     @Id
+    @EqualsAndHashCode.Include  // CHỈ dùng name cho equals/hashCode
     private String name;
+
     private String description;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-            name = "role_permissions",
+            name = "role_permission",
             joinColumns = @JoinColumn(name = "role_name"),
             inverseJoinColumns = @JoinColumn(name = "permission_name")
     )
     @Builder.Default
     private Set<PermissionEntity> permissions = new HashSet<>();
-
 }

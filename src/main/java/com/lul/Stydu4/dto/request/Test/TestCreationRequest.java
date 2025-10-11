@@ -13,11 +13,9 @@ import lombok.NoArgsConstructor;
 public class TestCreationRequest {
 
     private String name;
-    private String description;
     private Integer status;
-    private Long numberOfParticipants;
-    private String audioPath;
-    private TestType type;
-    private String slug;
+    private String type;
+    private String description;
+    private Long numberOfParticipants=0L;
 
 }

@@ -1,6 +1,7 @@
 package com.lul.Stydu4.entity;
 
 
+import com.lul.Stydu4.enums.PartType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,7 +21,8 @@ public class PartTestEntity extends BaseEntity {
 
     private String name;
     private String description;
-    private String type;
+
+    private PartType type;
 
     @ManyToOne
     @JoinColumn(name = "test_id")
