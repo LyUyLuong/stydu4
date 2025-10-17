@@ -29,11 +29,9 @@ public interface TestMapper {
     @Mapping(source = "partTestEntities", target = "parts")
     TestDetailResponse toTestResponse(TestEntity entity);
 
-
-
-    @Mapping(target = "partsCount",
-            expression = "java(entity.getPartTestEntities() == null ? 0 : entity.getPartTestEntities().size())")
+    @Mapping(target = "partsCount", ignore = true)
     TestSummaryResponse toTestSummary(TestEntity entity);
+
 
 
 }

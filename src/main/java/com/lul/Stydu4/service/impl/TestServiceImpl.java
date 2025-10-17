@@ -2,7 +2,7 @@ package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.dto.request.Test.TestCreationRequest;
 import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
-import com.lul.Stydu4.dto.request.Test.TestSpecification;
+import com.lul.Stydu4.repository.specification.TestSpecification;
 import com.lul.Stydu4.dto.request.Test.TestUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
@@ -18,7 +18,6 @@ import com.lul.Stydu4.mapper.TestMapper;
 import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.ITestRepository;
 import com.lul.Stydu4.service.ITestService;
-import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -27,10 +26,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.lul.Stydu4.util.EnumValidator.validateAndConvert;
 
@@ -44,14 +44,6 @@ public class TestServiceImpl implements ITestService {
     IPartTestRepository partTestRepository;
     TestMapper testMapper;
     PartTestMapper partTestMapper;
-
-
-    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
-            "name", "type", "status", "createdDate", "modifiedDate"
-    );
-
-
-
 
     @Override
     public TestDetailResponse create(TestCreationRequest request) {
@@ -165,48 +157,45 @@ public class TestServiceImpl implements ITestService {
 
 
 
+    @Transactional(readOnly = true)
     @Override
-    public PageResponse<TestSummaryResponse> searchTests(TestSearchRequest request, Pageable pageable) {
+    public PageResponse<TestSummaryResponse> searchTests(TestSearchRequest req, Pageable pageable) {
+        int idx = Math.max(0, req.getPage() - 1);
+        int size = Math.min(req.getSize(), 100);
+        Sort sort = sanitizeSort(pageable.getSort());
+        Pageable pg = PageRequest.of(idx, size, sort);
 
-        log.info("Searching tests with request: {}", request);
-        log.info("Original pageable: {}", pageable);
+        long t0 = System.nanoTime();
+        Page<TestEntity> page = testRepository.findAll(
+                TestSpecification.buildSpecification(req), pg);
+        long t1 = System.nanoTime();
 
-        // 1. Convert page từ 1-indexed (user) → 0-indexed (database)
-        int pageIndex = request.getPage() > 0 ? request.getPage() - 1 : 0;
+        // Bulk count parts
+        var ids = page.getContent().stream().map(TestEntity::getId).toList();
+        var counts = partTestRepository.countByTestIds(ids).stream()
+                .collect(Collectors.toMap(r->(String)r[0], r->(Long)r[1]));
 
-        // 2. Sanitize sort (whitelist + default)
-        Sort sanitizedSort = sanitizeSort(pageable.getSort());
-        log.info("Sanitized sort: {}", sanitizedSort);
+        var data = page.getContent().stream().map(e -> {
+            var dto = testMapper.toTestSummary(e);
+            dto.setPartsCount(counts.getOrDefault(e.getId(),0L).intValue());
+            return dto;
+        }).toList();
 
-        // 3. Rebuild pageable với page và sort đã xử lý
-        Pageable sanitizedPageable = PageRequest.of(
-                pageIndex,
-                request.getSize(),
-                sanitizedSort
-        );
+        log.info("searchTests latency={}ms, page={}, size={}, total={}",
+                (t1-t0)/1_000_000, idx+1, size, page.getTotalElements());
 
-        // 4. Build specification từ filter fields
-        Specification<TestEntity> spec = TestSpecification.buildSpecification(request);
-
-        // 5. Query database
-        Page<TestEntity> page = testRepository.findAll(spec, sanitizedPageable);
-
-        log.info("Found {} tests, total elements: {}", page.getNumberOfElements(), page.getTotalElements());
-
-        // 6. Map Entity → DTO
-        List<TestSummaryResponse> data = page.getContent().stream()
-                .map(testMapper::toTestSummary)
-                .toList();
-
-        // 7. Build response (convert page lại sang 1-indexed cho user)
         return PageResponse.<TestSummaryResponse>builder()
                 .data(data)
-                .currentPage(pageIndex + 1)
-                .pageSize(request.getSize())
+                .currentPage(idx+1)
+                .pageSize(size)
                 .totalPages(page.getTotalPages())
                 .totalElements(page.getTotalElements())
                 .build();
     }
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "name", "type", "status", "createdDate", "modifiedDate"
+    );
 
     /**
      * Sanitize sort: whitelist fields và set default nếu empty

@@ -154,7 +154,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         boolean isAuthenticated =  signedJWT.verify(verifier);
 
-        if(!isAuthenticated && expiryTime.after(new Date())){
+        if(!isAuthenticated || expiryTime.before(new Date())){
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 

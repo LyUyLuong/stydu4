@@ -1,11 +1,13 @@
-package com.lul.Stydu4.dto.request.Test;
+package com.lul.Stydu4.repository.specification;
 
 import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
 import com.lul.Stydu4.entity.TestEntity;
 import com.lul.Stydu4.enums.TestType;
-import com.lul.Stydu4.util.EnumValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static com.lul.Stydu4.util.EnumValidator.convertOrNull;
 
@@ -19,7 +21,8 @@ public class TestSpecification {
         return Specification.allOf(
                 nameLike(request.getName()),
                 typeEquals(request.getType()),
-                statusEquals(request.getStatus())
+                statusEquals(request.getStatus()),
+                createdBetween(request.getCreatedFrom(), request.getCreatedTo())
         );
     }
 
@@ -66,6 +69,31 @@ public class TestSpecification {
                 return null;
             }
             return cb.equal(root.get("status"), status);
+        };
+    }
+
+    /**
+     * Tìm kiếm theo khoảng thời gian tạo (createdDate)
+     * from: bắt đầu từ 00:00:00 của ngày
+     * to: kết thúc tại 23:59:59 của ngày
+     */
+    private static Specification<TestEntity> createdBetween(LocalDate from, LocalDate to) {
+        return (root, query, cb) -> {
+            if (from == null && to == null) {
+                return null;
+            }
+
+            LocalDateTime start = from != null ? from.atStartOfDay() : null;
+            LocalDateTime end = to != null ? to.atTime(23, 59, 59) : null;
+
+            if (start != null && end != null) {
+                return cb.between(root.get("createdDate"), start, end);
+            }
+            if (start != null) {
+                return cb.greaterThanOrEqualTo(root.get("createdDate"), start);
+            }
+            // end != null
+            return cb.lessThanOrEqualTo(root.get("createdDate"), end);
         };
     }
 }

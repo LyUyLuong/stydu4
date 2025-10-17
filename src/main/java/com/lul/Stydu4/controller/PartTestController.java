@@ -1,17 +1,21 @@
 package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.request.PartTest.PartTestCreationRequest;
+import com.lul.Stydu4.dto.request.PartTest.PartTestSearchRequest;
 import com.lul.Stydu4.dto.request.PartTest.PartTestUpdateRequest;
+import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
+import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
 import com.lul.Stydu4.service.IPartTestService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,6 +41,14 @@ public class PartTestController {
                                                                        @RequestParam(value = "size", required = false, defaultValue = "5") int size) {
         return ApiResponse.<PageResponse<PartTestSummaryResponse>>builder()
                 .result(partTestService.getAllPartTests(page,size))
+                .build();
+    }
+
+    @GetMapping("/search-with-specification")
+    ApiResponse<PageResponse<PartTestSummaryResponse>> getPartTestsBySpecification(@ModelAttribute @Valid PartTestSearchRequest request,
+                                                                           Pageable pageable) {
+        return ApiResponse.<PageResponse<PartTestSummaryResponse>>builder()
+                .result(partTestService.searchPartTests(request,pageable))
                 .build();
     }
 

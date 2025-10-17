@@ -31,4 +31,4 @@ logging:
     com.lul.Stydu4.exception: DEBUG
     com.lul.Stydu4.converter: DEBUG
     org.springframework.web: DEBUG
-
+    org.springframework.security: TRACE
