@@ -3,6 +3,7 @@ package com.lul.Stydu4.service.impl;
 import com.lul.Stydu4.dto.request.AuthenticationRequest;
 import com.lul.Stydu4.dto.request.IntrospectRequest;
 import com.lul.Stydu4.dto.request.LogoutRequest;
+import com.lul.Stydu4.dto.request.RefreshTokenRequest;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
 import com.lul.Stydu4.entity.UserEntity;
@@ -45,6 +46,14 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
 
+    @NonFinal
+    @Value("${jwt.valid-duration}")
+    protected long VALID_DURATION;
+
+    @NonFinal
+    @Value("${jwt.refreshable-duration}")
+    protected long REFRESHABLE_DURATION;
+
     IUserRepository userRepository;
     UserMapper userMapper;
     IJwtBlacklistService jwtBlacklistService;
@@ -74,7 +83,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         boolean isValid = true;
 
         try {
-            verify(token);
+            verify(token,false);
         } catch (AppException e) {
             isValid = false;
         }
@@ -94,7 +103,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 .subject(user.getUsername())
                 .issuer("Stydu4")
                 .issueTime(new Date())
-                .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
+                .expirationTime(new Date(Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
                 .claim("scope", buildScope(user))
                 .jwtID(UUID.randomUUID().toString())
                 .build();
@@ -132,25 +141,31 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     }
 
     @Override
-    public void logout(LogoutRequest request) throws ParseException, JOSEException {
-        SignedJWT token = verify(request.getToken());
+    public void logout(LogoutRequest request) {
+        try {
+            SignedJWT token = verify(request.getToken(), false);
 
-        String jit = token.getJWTClaimsSet().getJWTID();
-        Date expirationTime = token.getJWTClaimsSet().getExpirationTime();
+            String jit = token.getJWTClaimsSet().getJWTID();
+            Date expirationTime = token.getJWTClaimsSet().getExpirationTime();
 
-        long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000; // Tính TTL còn lại
-        if (ttl > 0) {
-            jwtBlacklistService.blacklistToken(jit, ttl);
+            long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000;
+            if (ttl > 0) {
+                jwtBlacklistService.blacklistToken(jit, ttl);
+            }
+        } catch (Exception e) {
+            log.info("Logout called with invalid or expired token, ignoring: {}", e.getMessage());
         }
     }
 
-    private SignedJWT verify(String token) throws JOSEException, ParseException {
+    private SignedJWT verify(String token,Boolean isRefresh) throws JOSEException, ParseException {
 
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
 
-        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        Date expiryTime = isRefresh
+                ? new Date(signedJWT.getJWTClaimsSet().getIssueTime().toInstant().plus(REFRESHABLE_DURATION,ChronoUnit.SECONDS).toEpochMilli())
+                : signedJWT.getJWTClaimsSet().getExpirationTime();
 
         boolean isAuthenticated =  signedJWT.verify(verifier);
 
@@ -158,10 +173,34 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-//        if (jwtBlacklistService.isTokenBlacklisted(signedJWT.getJWTClaimsSet().getJWTID()))
-//            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        if (jwtBlacklistService.isTokenBlacklisted(signedJWT.getJWTClaimsSet().getJWTID()))
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
 
         return signedJWT;
 
+    }
+
+    @Override
+    public AuthenticationResponse refreshToken(RefreshTokenRequest request) throws ParseException, JOSEException {
+
+        SignedJWT signedJWT = verify(request.getToken(),true);
+
+        String jit = signedJWT.getJWTClaimsSet().getJWTID();
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        String username = signedJWT.getJWTClaimsSet().getSubject();
+        UserEntity user = userRepository.findByUsername(username).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+
+        long ttl = (expiryTime.getTime() - System.currentTimeMillis()) / 1000;
+        if (ttl > 0) {
+            jwtBlacklistService.blacklistToken(jit, ttl);
+        }
+
+        String token = generateToken(user);
+
+        return AuthenticationResponse.builder()
+                .token(token)
+                .authenticated(true)
+                .build();
     }
 }
