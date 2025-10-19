@@ -24,7 +24,7 @@ public class TestSummaryResponse {
     private Integer status;
     private Long numberOfParticipants;
     private String audioPath;
-    private TestType type;
+    private String type;
     private String slug;
 
     private Integer partsCount;

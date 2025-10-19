@@ -25,10 +25,11 @@ public interface TestMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateTestEntityFromRequest(TestUpdateRequest request, @MappingTarget TestEntity entity);
 
-
+    @Mapping(source = "type.name", target = "type")
     @Mapping(source = "partTestEntities", target = "parts")
     TestDetailResponse toTestResponse(TestEntity entity);
 
+    @Mapping(source = "type.name", target = "type")
     @Mapping(target = "partsCount", ignore = true)
     TestSummaryResponse toTestSummary(TestEntity entity);
 

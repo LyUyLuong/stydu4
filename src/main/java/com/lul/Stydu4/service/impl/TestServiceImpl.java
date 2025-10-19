@@ -172,8 +172,14 @@ public class TestServiceImpl implements ITestService {
 
         // Bulk count parts
         var ids = page.getContent().stream().map(TestEntity::getId).toList();
-        var counts = partTestRepository.countByTestIds(ids).stream()
-                .collect(Collectors.toMap(r->(String)r[0], r->(Long)r[1]));
+
+        Map<String, Long> counts;
+        if (ids.isEmpty()) {
+            counts = Collections.emptyMap(); // tránh gọi repo với []
+        } else {
+            counts = partTestRepository.countByTestIds(ids).stream()
+                    .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+        }
 
         var data = page.getContent().stream().map(e -> {
             var dto = testMapper.toTestSummary(e);

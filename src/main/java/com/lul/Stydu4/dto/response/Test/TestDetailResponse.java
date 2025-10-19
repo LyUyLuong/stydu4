@@ -23,7 +23,7 @@ public class TestDetailResponse {
     private Integer status;
     private Long numberOfParticipants;
     private String audioPath;
-    private TestType type;
+    private String type;
     private String slug;
 
     private List<PartTestDetailResponse> parts;
