@@ -65,7 +65,7 @@ public class PartTestServiceImpl implements IPartTestService {
         // Gán testEntity nếu testId hợp lệ
         if (request.getTestId() != null) {
             TestEntity test = testRepository.findById(request.getTestId())
-                    .orElseThrow(() -> new RuntimeException("Test not found with id: " + request.getTestId()));
+                    .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
             entity.setTestEntity(test);
         }
 
@@ -96,32 +96,36 @@ public class PartTestServiceImpl implements IPartTestService {
             existing.setType(partType);
         }
 
-        // Update questions - ĐÚNG CÁCH
-        if (request.getQuestionIds() != null && !request.getQuestionIds().isEmpty()) {
-            List<QuestionTestEntity> newQuestions = questionTestRepository
-                    .findAllById(request.getQuestionIds());
 
-            if (newQuestions.size() != request.getQuestionIds().size()) {
-                throw new AppException(ErrorCode.QUESTION_NOT_FOUND);
-            }
-
-            // Clear và add bằng helper method
+        if (request.getQuestionIds() != null) {
             existing.getQuestions().clear();
-            newQuestions.forEach(existing::addQuestion);
+
+            if (!request.getQuestionIds().isEmpty()) {
+                List<QuestionTestEntity> newQuestions = questionTestRepository
+                        .findAllById(request.getQuestionIds());
+
+                if (newQuestions.size() != request.getQuestionIds().size()) {
+                    throw new AppException(ErrorCode.QUESTION_NOT_FOUND);
+                }
+
+                newQuestions.forEach(existing::addQuestion);
+            }
         }
 
-        // Update question groups - ĐÚNG CÁCH
-        if (request.getQuestionGroupsIds() != null && !request.getQuestionGroupsIds().isEmpty()) {
-            List<QuestionGroupEntity> newGroups = questionGroupRepository
-                    .findAllById(request.getQuestionGroupsIds());
 
-            if (newGroups.size() != request.getQuestionGroupsIds().size()) {
-                throw new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND);
-            }
-
-            // Clear và add bằng helper method
+        if (request.getQuestionGroupsIds() != null ) {
             existing.getQuestionGroups().clear();
-            newGroups.forEach(existing::addQuestionGroup);
+
+            if (!request.getQuestionGroupsIds().isEmpty()) {
+                List<QuestionGroupEntity> newGroups = questionGroupRepository
+                        .findAllById(request.getQuestionGroupsIds());
+
+                if (newGroups.size() != request.getQuestionGroupsIds().size()) {
+                    throw new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND);
+                }
+
+                newGroups.forEach(existing::addQuestionGroup);
+            }
         }
 
         PartTestEntity updated = partTestRepository.save(existing);
@@ -144,7 +148,7 @@ public class PartTestServiceImpl implements IPartTestService {
         List<PartTestSummaryResponse> partTestSummaries = partTestEntities.getContent().stream().map(partTestMapper::toPartTestSummary).toList();
 
         return PageResponse.<PartTestSummaryResponse>builder()
-                .currentPage(page)
+                .currentPage(pageNo+1)
                 .totalPages(partTestEntities.getTotalPages())
                 .totalElements(partTestEntities.getTotalElements())
                 .pageSize(size)
@@ -164,6 +168,8 @@ public class PartTestServiceImpl implements IPartTestService {
         partTestRepository.deleteById(partTestId);
     }
 
+
+
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PartTestSummaryResponse> searchPartTests(PartTestSearchRequest request, Pageable pageable) {
@@ -177,19 +183,26 @@ public class PartTestServiceImpl implements IPartTestService {
                 PartTestSpecification.buildSpecification(request), pg);
         long t1 = System.nanoTime();
 
-        // Bulk count questions
-        var partIds = page.getContent().stream().map(PartTestEntity::getId).toList();
-        var questionCounts = questionTestRepository.countQuestionsByPartIds(partIds).stream()
-                .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
-        var questionGroupCounts = questionGroupRepository.countQuestionGroupsByPartIds(partIds).stream()
-                .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+        List<PartTestSummaryResponse> data;
 
-        var data = page.getContent().stream().map(e -> {
-            var dto = partTestMapper.toPartTestSummary(e);
-            dto.setQuestionsCount(questionCounts.getOrDefault(e.getId(), 0L).intValue());
-            dto.setQuestionGroupsCount(questionGroupCounts.getOrDefault(e.getId(), 0L).intValue());
-            return dto;
-        }).toList();
+        if (page.isEmpty()) {
+            // Empty page → skip count queries, return empty list
+            data = List.of();
+        } else {
+            // Bulk count questions
+            var partIds = page.getContent().stream().map(PartTestEntity::getId).toList();
+            var questionCounts = questionTestRepository.countQuestionsByPartIds(partIds).stream()
+                    .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+            var questionGroupCounts = questionGroupRepository.countQuestionGroupsByPartIds(partIds).stream()
+                    .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+
+            data = page.getContent().stream().map(e -> {
+                var dto = partTestMapper.toPartTestSummary(e);
+                dto.setQuestionsCount(questionCounts.getOrDefault(e.getId(), 0L).intValue());
+                dto.setQuestionGroupsCount(questionGroupCounts.getOrDefault(e.getId(), 0L).intValue());
+                return dto;
+            }).toList();
+        }
 
         log.info("searchPartTests latency={}ms, page={}, size={}, total={}",
                 (t1 - t0) / 1_000_000, idx + 1, size, page.getTotalElements());

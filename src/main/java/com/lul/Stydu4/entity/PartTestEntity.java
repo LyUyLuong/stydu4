@@ -45,6 +45,7 @@ public class PartTestEntity extends BaseEntity {
     @Builder.Default
     private List<QuestionGroupEntity> questionGroups = new ArrayList<>();
 
+
     // Helper methods để sync bidirectional relationships
     public void addQuestion(QuestionTestEntity question) {
         questions.add(question);
