@@ -1,5 +1,7 @@
 package com.lul.Stydu4.entity;
 
+import com.lul.Stydu4.enums.QuestionType;
+import com.lul.Stydu4.enums.TestType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,7 +26,9 @@ public class QuestionTestEntity extends BaseEntity{
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private QuestionType type;
+
     private String audioPath;
     private String image;
     private String description;

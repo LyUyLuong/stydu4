@@ -34,3 +34,8 @@ jwt:
 #    com.lul.Stydu4.converter: DEBUG
 #    org.springframework.web: DEBUG
 #    org.springframework.security: TRACE
+logging:
+  level:
+    org:
+      springframework:
+        security=DEBUG:

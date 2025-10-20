@@ -11,6 +11,7 @@ import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import com.lul.Stydu4.entity.QuestionTestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.QuestionType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.AnswerMapper;
 import com.lul.Stydu4.mapper.QuestionTestMapper;
@@ -27,12 +28,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+
+import static com.lul.Stydu4.util.EnumValidator.validateAndConvert;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +59,14 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         // Map basic question fields
         QuestionTestEntity questionTest = questionTestMapper.toQuestionTestEntity(request);
 
+        // Validate và convert type từ String → Enum
+        QuestionType questionType = validateAndConvert(
+                request.getType(),
+                QuestionType.class,
+                ErrorCode.INVALID_QUESTION_TYPE
+        );
+        questionTest.setType(questionType);
+
         // Set PartEntity if partId provided
         if (request.getPartId() != null && !request.getPartId().isBlank()) {
             PartTestEntity part = partTestRepository.findById(request.getPartId())
@@ -75,7 +87,7 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             List<AnswerEntity> answerEntities = request.getAnswers().stream()
                     .map(answerRequest -> {
                         AnswerEntity answer = answerMapper.toAnswerEntity(answerRequest);
-                        answer.setQuestion(questionTest); // Set bidirectional relationship
+                        answer.setQuestion(questionTest);
                         return answer;
                     })
                     .collect(Collectors.toList());
@@ -96,7 +108,10 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
     public PageResponse<QuestionTestSummaryResponse> getAllQuestionTests(int page, int size) {
         log.info("Fetching all question tests - page: {}, size: {}", page, size);
 
-        Pageable pageable = PageRequest.of(page - 1, size);
+        int pageNo = page > 0 ? page - 1 : 0;
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdDate");
+        Pageable pageable = PageRequest.of(pageNo, size, sort);
+
         Page<QuestionTestEntity> questionTestPage = questionTestRepository.findAll(pageable);
 
         List<QuestionTestSummaryResponse> responses = questionTestPage.getContent()
@@ -121,19 +136,30 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
     ) {
         log.info("Searching question tests with criteria: {}", request);
 
-        Specification<QuestionTestEntity> spec = QuestionTestSpecification.buildSpecification(request);
-        Page<QuestionTestEntity> questionTestPage = questionTestRepository.findAll(spec, pageable);
+        int idx = Math.max(0, request.getPage() - 1);
+        int size = Math.min(request.getSize(), 100);
+        Sort sort = sanitizeSort(pageable.getSort());
+        Pageable pg = PageRequest.of(idx, size, sort);
 
-        List<QuestionTestSummaryResponse> responses = questionTestPage.getContent()
+        long t0 = System.nanoTime();
+        Page<QuestionTestEntity> page = questionTestRepository.findAll(
+                QuestionTestSpecification.buildSpecification(request), pg
+        );
+        long t1 = System.nanoTime();
+
+        List<QuestionTestSummaryResponse> responses = page.getContent()
                 .stream()
                 .map(questionTestMapper::toQuestionSummaryResponse)
                 .toList();
 
+        log.info("searchQuestionTests latency={}ms, page={}, size={}, total={}",
+                (t1 - t0) / 1_000_000, idx + 1, size, page.getTotalElements());
+
         return PageResponse.<QuestionTestSummaryResponse>builder()
-                .currentPage(pageable.getPageNumber() + 1)
-                .pageSize(questionTestPage.getSize())
-                .totalPages(questionTestPage.getTotalPages())
-                .totalElements(questionTestPage.getTotalElements())
+                .currentPage(idx + 1)
+                .pageSize(size)
+                .totalPages(page.getTotalPages())
+                .totalElements(page.getTotalElements())
                 .data(responses)
                 .build();
     }
@@ -169,8 +195,14 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             existing.setContent(request.getContent());
         }
 
-        if (request.getType() != null) {
-            existing.setType(request.getType());
+        // Validate và convert type
+        if (request.getType() != null && !request.getType().isBlank()) {
+            QuestionType questionType = validateAndConvert(
+                    request.getType(),
+                    QuestionType.class,
+                    ErrorCode.INVALID_QUESTION_TYPE
+            );
+            existing.setType(questionType);
         }
 
         if (request.getAudioPath() != null) {
@@ -186,21 +218,21 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         }
 
         // Update PartEntity relationship
-        if (request.getPartId() != null) {
+        if (request.getPartId() != null && !request.getPartId().isBlank()) {
             PartTestEntity part = partTestRepository.findById(request.getPartId())
                     .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
             existing.setPartEntity(part);
         }
 
         // Update QuestionGroup relationship
-        if (request.getQuestionGroupId() != null) {
+        if (request.getQuestionGroupId() != null && !request.getQuestionGroupId().isBlank()) {
             QuestionGroupEntity questionGroup = questionGroupRepository
                     .findById(request.getQuestionGroupId())
                     .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
             existing.setQuestionGroupEntity(questionGroup);
         }
 
-        // Update Answers (OneToMany relationship)
+        // Update Answers
         if (request.getAnswerIds() != null && !request.getAnswerIds().isEmpty()) {
             List<AnswerEntity> newAnswers = answerRepository.findAllById(request.getAnswerIds());
 
@@ -208,7 +240,7 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
                 throw new AppException(ErrorCode.ANSWER_NOT_FOUND);
             }
 
-            // Clear existing and add new - ensures orphanRemoval works
+            // Clear existing and add new
             existing.getAnswers().clear();
             newAnswers.forEach(answer -> {
                 answer.setQuestion(existing);
@@ -233,5 +265,35 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
 
         questionTestRepository.deleteById(questionTestId);
         log.info("Question test deleted successfully with id: {}", questionTestId);
+    }
+
+    // ============ HELPER METHODS ============
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "name", "content", "type", "createdDate", "modifiedDate"
+    );
+
+    private Sort sanitizeSort(Sort sort) {
+        if (sort.isUnsorted()) {
+            log.info("No sort provided, using default: createdDate DESC");
+            return Sort.by(Sort.Direction.DESC, "createdDate");
+        }
+
+        List<Sort.Order> validOrders = sort.stream()
+                .filter(order -> {
+                    boolean valid = ALLOWED_SORT_FIELDS.contains(order.getProperty());
+                    if (!valid) {
+                        log.warn("Invalid sort field '{}' detected, skipping", order.getProperty());
+                    }
+                    return valid;
+                })
+                .toList();
+
+        if (validOrders.isEmpty()) {
+            log.warn("All sort fields were invalid, using default: createdDate DESC");
+            return Sort.by(Sort.Direction.DESC, "createdDate");
+        }
+
+        return Sort.by(validOrders);
     }
 }

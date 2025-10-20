@@ -1,6 +1,5 @@
 package com.lul.Stydu4.entity;
 
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,7 +9,7 @@ import lombok.*;
 @AllArgsConstructor
 @Entity
 @Builder
-public class ResultHavePartsEntity extends BaseEntity{
+public class ResultHavePartsEntity extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -24,4 +23,8 @@ public class ResultHavePartsEntity extends BaseEntity{
     @JoinColumn(name = "part_id", nullable = false)
     private PartTestEntity partTest;
 
+    // Thêm fields để lưu kết quả của từng part
+    private Integer correctAnswers;
+    private Integer totalQuestions;
+    private Double accuracy;
 }

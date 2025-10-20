@@ -15,6 +15,7 @@ import java.util.List;
 @Repository
 public interface IPartTestRepository extends JpaRepository<PartTestEntity, String>, JpaSpecificationExecutor<PartTestEntity> {
     Page<PartTestEntity> findAllBy(Pageable pageable);
+    List<PartTestEntity> findByTestEntityIdOrderByCreatedDateAsc(String testEntityId);
 
     @Query("select p.testEntity.id, count(p.id) " +
             "from PartTestEntity p " +

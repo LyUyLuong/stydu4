@@ -13,7 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Builder
-public class UserEntity {
+public class UserEntity extends BaseEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -24,6 +24,9 @@ public class UserEntity {
     private String lastName;
     private String password;
     private LocalDate dob;
+
+    private String email;
+    private String phoneNumber;
 
     @ManyToMany
     @JoinTable(

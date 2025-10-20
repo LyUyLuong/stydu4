@@ -2,6 +2,7 @@ package com.lul.Stydu4.repository.specification;
 
 import com.lul.Stydu4.dto.request.Question.QuestionTestSearchRequest;
 import com.lul.Stydu4.entity.QuestionTestEntity;
+import com.lul.Stydu4.enums.QuestionType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -35,16 +36,24 @@ public class QuestionTestSpecification {
         };
     }
 
-
     /**
-     * Tìm kiếm theo type (exact match, case-insensitive)
+     * Tìm kiếm theo type (exact match, validate enum)
+     * THAY ĐỔI: Validate String thành QuestionType enum
      */
     private static Specification<QuestionTestEntity> typeEquals(String type) {
         return (root, query, cb) -> {
             if (type == null || type.isBlank()) {
                 return null;
             }
-            return cb.equal(cb.lower(root.get("type")), type.toLowerCase().trim());
+
+            try {
+                // Parse String to Enum
+                QuestionType questionType = QuestionType.valueOf(type.toUpperCase().trim());
+                return cb.equal(root.get("type"), questionType);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid question type '{}', ignoring filter", type);
+                return null; // Ignore invalid type
+            }
         };
     }
 
@@ -62,7 +71,6 @@ public class QuestionTestSpecification {
             );
         };
     }
-
 
     /**
      * Tìm kiếm theo khoảng thời gian tạo

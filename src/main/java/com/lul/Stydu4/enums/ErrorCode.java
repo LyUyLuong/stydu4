@@ -32,15 +32,20 @@ public enum ErrorCode {
     //PartTestErrorCode
     PART_TEST_NOT_FOUND(3010, "Part test not found",HttpStatus.NOT_FOUND),
     INVALID_PART_TYPE(3014, "Invalid part type", HttpStatus.BAD_REQUEST),
+    INVALID_PART_SELECTION(3015, "Invalid part selection", HttpStatus.BAD_REQUEST),
 
     // Role ErrorCode
     INVALID_ROLE(4013, "Invalid role", HttpStatus.BAD_REQUEST),
 
     QUESTION_NOT_FOUND(5001, "Question not found", HttpStatus.NOT_FOUND),
+    INVALID_QUESTION_TYPE(5002, "Invalid question type", HttpStatus.BAD_REQUEST),
 
     QUESTION_GROUP_NOT_FOUND(6001, "Question group not found", HttpStatus.NOT_FOUND),
 
-    ANSWER_NOT_FOUND(7001, "Answer not found", HttpStatus.NOT_FOUND)
+    ANSWER_NOT_FOUND(7001, "Answer not found", HttpStatus.NOT_FOUND),
+
+    RESULT_NOT_FOUND(8001, "Result not found", HttpStatus.NOT_FOUND),
+    CALCULATION_ERROR(8002, "Calculation error occurred", HttpStatus.INTERNAL_SERVER_ERROR)
     ;
 
     ErrorCode(int code, String message, HttpStatus statusCode) {
