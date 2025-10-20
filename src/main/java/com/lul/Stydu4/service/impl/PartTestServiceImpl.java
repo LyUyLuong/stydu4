@@ -2,6 +2,8 @@ package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.dto.request.PartTest.PartTestCreationRequest;
 import com.lul.Stydu4.dto.request.PartTest.PartTestSearchRequest;
+import com.lul.Stydu4.entity.QuestionGroupEntity;
+import com.lul.Stydu4.entity.QuestionTestEntity;
 import com.lul.Stydu4.repository.specification.PartTestSpecification;
 import com.lul.Stydu4.dto.request.PartTest.PartTestUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
@@ -71,10 +73,19 @@ public class PartTestServiceImpl implements IPartTestService {
     }
 
     @Override
+    @Transactional
     public PartTestDetailResponse update(String partTestID, PartTestUpdateRequest request) {
-        PartTestEntity existing = partTestRepository.findById(partTestID).orElseThrow(
-                () -> new AppException(ErrorCode.PART_TEST_NOT_FOUND)
-        );
+        PartTestEntity existing = partTestRepository.findById(partTestID)
+                .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
+
+        // Update basic fields
+        if (request.getName() != null && !request.getName().isBlank()) {
+            existing.setName(request.getName());
+        }
+
+        if (request.getDescription() != null) {
+            existing.setDescription(request.getDescription());
+        }
 
         if (request.getType() != null) {
             PartType partType = validateAndConvert(
@@ -85,10 +96,38 @@ public class PartTestServiceImpl implements IPartTestService {
             existing.setType(partType);
         }
 
+        // Update questions - ĐÚNG CÁCH
+        if (request.getQuestionIds() != null && !request.getQuestionIds().isEmpty()) {
+            List<QuestionTestEntity> newQuestions = questionTestRepository
+                    .findAllById(request.getQuestionIds());
 
-        partTestMapper.updatePartTestEntityFromRequest(request, existing);
-        return partTestMapper.toPartTestResponse(partTestRepository.save(existing));
+            if (newQuestions.size() != request.getQuestionIds().size()) {
+                throw new AppException(ErrorCode.QUESTION_NOT_FOUND);
+            }
+
+            // Clear và add bằng helper method
+            existing.getQuestions().clear();
+            newQuestions.forEach(existing::addQuestion);
+        }
+
+        // Update question groups - ĐÚNG CÁCH
+        if (request.getQuestionGroupsIds() != null && !request.getQuestionGroupsIds().isEmpty()) {
+            List<QuestionGroupEntity> newGroups = questionGroupRepository
+                    .findAllById(request.getQuestionGroupsIds());
+
+            if (newGroups.size() != request.getQuestionGroupsIds().size()) {
+                throw new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND);
+            }
+
+            // Clear và add bằng helper method
+            existing.getQuestionGroups().clear();
+            newGroups.forEach(existing::addQuestionGroup);
+        }
+
+        PartTestEntity updated = partTestRepository.save(existing);
+        return partTestMapper.toPartTestResponse(updated);
     }
+
 
     @Override
     public PageResponse<PartTestSummaryResponse> getAllPartTests(int page, int size) {

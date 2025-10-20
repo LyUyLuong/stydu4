@@ -1,5 +1,4 @@
-package com.lul.Stydu4.dto.request.Question;
-
+package com.lul.Stydu4.dto.response.Question;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,7 +9,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class QuestionCreateRequest {
+public class QuestionTestSummaryResponse {
+
+    private String id;
 
     private String name;
     private String content;
@@ -18,5 +19,11 @@ public class QuestionCreateRequest {
     private String audioPath;
     private String image;
     private String description;
+
+    private String partTestId;
+
+    private String questionGroupId;
+
+    private Integer answersCount;
 
 }

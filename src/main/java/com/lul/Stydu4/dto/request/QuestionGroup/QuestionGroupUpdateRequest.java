@@ -21,4 +21,5 @@ public class QuestionGroupUpdateRequest {
     private String image;
 
     private List<String> questionIds;
+    private String partId;
 }

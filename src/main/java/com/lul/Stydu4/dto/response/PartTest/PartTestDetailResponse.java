@@ -1,6 +1,6 @@
 package com.lul.Stydu4.dto.response.PartTest;
 
-import com.lul.Stydu4.dto.response.Question.QuestionDetailResponse;
+import com.lul.Stydu4.dto.response.Question.QuestionTestDetailResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupDetailResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,8 +19,8 @@ public class PartTestDetailResponse {
     private String name;
     private String description;
     private String type;
-    private String testId; // null nếu chưa gán test nào
+    private String testId;
 
-    private List<QuestionDetailResponse> questions;
+    private List<QuestionTestDetailResponse> questions;
     private List<QuestionGroupDetailResponse> questionGroups;
 }

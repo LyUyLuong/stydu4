@@ -13,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class QuestionSummaryResponse {
+public class QuestionTestDetailResponse {
 
     private String id;
 
@@ -28,6 +28,7 @@ public class QuestionSummaryResponse {
 
     private String questionGroupId;
 
-    private Integer answersCount;
+    @Builder.Default
+    private List<AnswerDetailResponse> answers = new ArrayList<>();
 
 }

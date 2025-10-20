@@ -6,11 +6,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class QuestionUpdateRequest {
+public class QuestionTestUpdateRequest {
 
     private String id;
     private String name;
@@ -19,6 +21,10 @@ public class QuestionUpdateRequest {
     private String audioPath;
     private String image;
     private String description;
+
+    private String questionGroupId;
+    private String partId;
+    private List<String> answerIds;
 
 
 }

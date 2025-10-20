@@ -7,9 +7,7 @@ import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
 import com.lul.Stydu4.entity.PartTestEntity;
 import org.mapstruct.*;
 
-import java.util.List;
-
-@Mapper(componentModel = "spring", uses = {QuestionMapper.class, QuestionGroupMapper.class})
+@Mapper(componentModel = "spring", uses = {QuestionTestMapper.class, QuestionGroupMapper.class})
 public interface PartTestMapper {
 
 

@@ -1,11 +1,6 @@
 package com.lul.Stydu4.dto.response.QuestionGroupResponse;
 
-import com.lul.Stydu4.dto.response.Question.QuestionDetailResponse;
-import com.lul.Stydu4.entity.PartTestEntity;
-import com.lul.Stydu4.entity.QuestionTestEntity;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import com.lul.Stydu4.dto.response.Question.QuestionTestDetailResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +24,6 @@ public class QuestionGroupDetailResponse {
 
     private String partTestId;
 
-    private List<QuestionDetailResponse> questions;
+    private List<QuestionTestDetailResponse> questions;
 
 }

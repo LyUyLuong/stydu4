@@ -36,6 +36,11 @@ public enum ErrorCode {
     // Role ErrorCode
     INVALID_ROLE(4013, "Invalid role", HttpStatus.BAD_REQUEST),
 
+    QUESTION_NOT_FOUND(5001, "Question not found", HttpStatus.NOT_FOUND),
+
+    QUESTION_GROUP_NOT_FOUND(6001, "Question group not found", HttpStatus.NOT_FOUND),
+
+    ANSWER_NOT_FOUND(7001, "Answer not found", HttpStatus.NOT_FOUND)
     ;
 
     ErrorCode(int code, String message, HttpStatus statusCode) {

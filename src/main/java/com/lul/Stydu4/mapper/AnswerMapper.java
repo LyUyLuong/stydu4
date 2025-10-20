@@ -10,20 +10,18 @@ import org.mapstruct.*;
 @Mapper(componentModel = "spring")
 public interface AnswerMapper {
 
-    @Mapping(target = "question", ignore = true)
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "question", ignore = true)
     AnswerEntity toAnswerEntity(AnswerCreateRequest request);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "question", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "id", ignore = true)
-    void updateAnswerEntity(AnswerUpdateRequest request, @MappingTarget AnswerEntity answerEntity);
+    void updateAnswerEntity(AnswerUpdateRequest request, @MappingTarget AnswerEntity entity);
 
     @Mapping(source = "question.id", target = "questionId")
     AnswerDetailResponse toAnswerDetailResponse(AnswerEntity entity);
 
-
     @Mapping(source = "question.id", target = "questionId")
     AnswerSummaryResponse toAnswerSummaryResponse(AnswerEntity entity);
-
 }

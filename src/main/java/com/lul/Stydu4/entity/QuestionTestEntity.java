@@ -19,7 +19,11 @@ public class QuestionTestEntity extends BaseEntity{
     private String id;
 
     private String name;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String content;
+
     private String type;
     private String audioPath;
     private String image;
