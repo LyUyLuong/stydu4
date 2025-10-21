@@ -7,6 +7,7 @@ import com.lul.Stydu4.dto.request.RefreshTokenRequest;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.AuthProvider;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.UserMapper;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.text.ParseException;
@@ -64,6 +66,10 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         var user = userRepository.findByUsername(authenticationRequest.getUsername())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        if (user.getAuthProvider() != AuthProvider.LOCAL) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS); // Hoặc tạo error mới
+        }
+
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         boolean authenticated =  passwordEncoder.matches(authenticationRequest.getPassword(), user.getPassword());
         if (!authenticated) {
@@ -84,7 +90,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         try {
             verify(token,false);
-        } catch (AppException e) {
+        } catch (AppException | ParseException | JOSEException e) {
             isValid = false;
         }
 
@@ -122,21 +128,28 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     }
 
     @Override
-    public String buildScope(UserEntity user){
+    public String buildScope(UserEntity user) {
         StringJoiner stringJoiner = new StringJoiner(" ");
 
-        if(!CollectionUtils.isEmpty(user.getRoles())){
+        if (!CollectionUtils.isEmpty(user.getRoles())) {
             user.getRoles().forEach(roleEntity -> {
-                stringJoiner.add("ROLE_"+roleEntity.getName());
-                if(!CollectionUtils.isEmpty(roleEntity.getPermissions())){
-                    roleEntity.getPermissions().forEach(permissionEntity -> {
-                        stringJoiner.add(permissionEntity.getName());
-                    });
+                stringJoiner.add("ROLE_" + roleEntity.getName());
+
+                if (roleEntity.getPermissions() != null) {
+                    try {
+                        if (!CollectionUtils.isEmpty(roleEntity.getPermissions())) {
+                            roleEntity.getPermissions().forEach(permissionEntity -> {
+                                stringJoiner.add(permissionEntity.getName());
+                            });
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not load permissions for role: {}", roleEntity.getName());
+                    }
                 }
             });
         }
 
-        log.warn(stringJoiner.toString());
+        log.info("Generated scope: {}", stringJoiner.toString());
         return stringJoiner.toString();
     }
 
@@ -203,4 +216,36 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 .authenticated(true)
                 .build();
     }
+
+    // Trong AuthenticationServiceImpl
+    @Override
+    @Transactional(readOnly = true)
+    public String generateTokenForOAuth2User(UserEntity user) {
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+
+        JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
+                .subject(user.getUsername())
+                .issuer("stydu4.com")
+                .issueTime(new Date())
+                .expirationTime(new Date(
+                        Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()
+                ))
+                .jwtID(UUID.randomUUID().toString())
+                .claim("scope", buildScope(user))
+                .claim("userId", user.getId())
+                .claim("authProvider", user.getAuthProvider().name())
+                .build();
+
+        Payload payload = new Payload(jwtClaimsSet.toJSONObject());
+        JWSObject jwsObject = new JWSObject(header, payload);
+
+        try {
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
+            return jwsObject.serialize();
+        } catch (JOSEException e) {
+            log.error("Cannot create token", e);
+            throw new RuntimeException(e);
+        }
+    }
+
 }

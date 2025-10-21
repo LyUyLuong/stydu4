@@ -1,6 +1,7 @@
 package com.lul.Stydu4.dto.request.User;
 
 import com.lul.Stydu4.validator.DobConstraint;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
@@ -23,6 +24,10 @@ public class UserCreationRequest {
     @NotBlank(message = "PASSWORD_REQUIRED")
     @Size(min = 6, message = "INVALID_PASSWORD")
     private String password;
+
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Email(message = "INVALID_EMAIL")
+    private String email;
 
     @DobConstraint(min = 16, message = "INVALID_DOB")
     private LocalDate dob;

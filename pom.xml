@@ -107,6 +107,12 @@
             <version>2.8.13</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
+
     </dependencies>
 
 	<build>
@@ -154,6 +160,37 @@
 					</compilerArgs>
 				</configuration>
 			</plugin>
+
+
+
+            <!-- JaCoCo - Generate coverage data -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>com/lul/Stydu4/dto/**</exclude>
+                        <exclude>com/lul/Stydu4/entity/**</exclude>
+                        <exclude>com/lul/Stydu4/mapper/**</exclude>
+                        <exclude>com/lul/Stydu4/configuration/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
 		</plugins>
 	</build>
 

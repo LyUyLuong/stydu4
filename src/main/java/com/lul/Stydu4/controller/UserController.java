@@ -56,7 +56,7 @@ public class UserController {
     ApiResponse<String> deleteUser(@PathVariable String userId){
         userService.deleteUser(userId);
         return ApiResponse.<String>builder()
-                .result("User deleted")
+                .message("User deleted")
                 .build();
     }
 

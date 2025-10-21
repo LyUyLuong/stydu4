@@ -5,6 +5,7 @@ import com.lul.Stydu4.dto.request.User.UserUpdateRequest;
 import com.lul.Stydu4.dto.response.UserResponse;
 import com.lul.Stydu4.entity.RoleEntity;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.AuthProvider;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.Role;
 import com.lul.Stydu4.exception.AppException;
@@ -40,19 +41,28 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public UserResponse createUser(UserCreationRequest userCreationRequest) {
+    public UserResponse createUser(UserCreationRequest request) {
 
-        if (userRepository.existsByUsername(userCreationRequest.getUsername()))
+        if (userRepository.existsByUsername(request.getUsername()))
             throw new AppException(ErrorCode.USER_EXISTED);
 
-        UserEntity userEntity = userMapper.toUserEntity(userCreationRequest);
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_EXISTED);
+        }
+
+        UserEntity userEntity = userMapper.toUserEntity(request);
+
+        userEntity.setAuthProvider(AuthProvider.LOCAL);
+        userEntity.setProviderId(null);
 
         HashSet<RoleEntity> roles = new HashSet<>();
         RoleEntity usrRole = roleRepository.findById(Role.USER.name()).orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
         roles.add(usrRole);
         userEntity.setRoles(roles);
 
-        userEntity.setPassword(passwordEncoder.encode(userCreationRequest.getPassword()));
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            userEntity.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
 
         return userMapper.toUserResponse(userRepository.save(userEntity));
     }
@@ -60,6 +70,12 @@ public class UserServiceImpl implements IUserService {
     @Override
     public UserResponse updateUser(String id, UserUpdateRequest userUpdateRequest) {
         UserEntity userEntity = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (userEntity.getAuthProvider() == AuthProvider.LOCAL
+                && userUpdateRequest.getPassword() != null
+                && !userUpdateRequest.getPassword().isEmpty()) {
+            userEntity.setPassword(passwordEncoder.encode(userUpdateRequest.getPassword()));
+        }
 
         userMapper.updateUserEntity(userEntity, userUpdateRequest);
         userEntity.setPassword(passwordEncoder.encode(userUpdateRequest.getPassword()));

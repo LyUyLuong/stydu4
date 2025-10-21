@@ -1,5 +1,6 @@
 package com.lul.Stydu4.entity;
 
+import com.lul.Stydu4.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,11 +23,22 @@ public class UserEntity extends BaseEntity{
     private String username;
     private String firstName;
     private String lastName;
+
+    @Column(nullable = true)
     private String password;
+
     private LocalDate dob;
 
     private String email;
     private String phoneNumber;
+
+    // Thêm các field mới cho OAuth2
+    @Column(name = "auth_provider")
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider; // LOCAL, GOOGLE
+
+    @Column(name = "provider_id")
+    private String providerId; // Google user ID
 
     @ManyToMany
     @JoinTable(

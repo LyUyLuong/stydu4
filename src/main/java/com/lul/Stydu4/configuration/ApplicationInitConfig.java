@@ -2,6 +2,7 @@ package com.lul.Stydu4.configuration;
 
 import com.lul.Stydu4.entity.RoleEntity;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.AuthProvider;
 import com.lul.Stydu4.enums.Role;
 import com.lul.Stydu4.repository.IRoleRepository;
 import com.lul.Stydu4.repository.IUserRepository;
@@ -28,7 +29,7 @@ public class ApplicationInitConfig {
     @Bean
     ApplicationRunner applicationRunner() {
         return args -> {
-            log.info("Initializing application data...");
+            log.info("========== APPLICATION INITIALIZATION START ==========");
 
             // 1. Init roles trước
             initRoles();
@@ -36,7 +37,7 @@ public class ApplicationInitConfig {
             // 2. Init admin user sau
             initAdminUser();
 
-            log.info("Application initialization completed");
+            log.info("========== APPLICATION INITIALIZATION COMPLETED ==========");
         };
     }
 
@@ -47,19 +48,28 @@ public class ApplicationInitConfig {
     public void initRoles() {
         log.info("Checking roles...");
 
+        int createdCount = 0;
         for (Role role : Role.values()) {
-            if (roleRepository.findById(role.name()).isEmpty()) {
+            if (!roleRepository.existsById(role.name())) {
                 RoleEntity roleEntity = RoleEntity.builder()
                         .name(role.name())
                         .description("Default " + role.name() + " role")
+                        .permissions(new HashSet<>())
                         .build();
 
                 roleRepository.save(roleEntity);
-                log.info("Created role: {}", role.name());
+                createdCount++;
+                log.info("✓ Created role: {}", role.name());
+            } else {
+                log.debug("Role {} already exists", role.name());
             }
         }
 
-        log.info("Roles initialization completed");
+        if (createdCount > 0) {
+            log.info("Created {} new role(s)", createdCount);
+        } else {
+            log.info("All roles already exist");
+        }
     }
 
     /**
@@ -69,30 +79,39 @@ public class ApplicationInitConfig {
     public void initAdminUser() {
         log.info("Checking admin user...");
 
-        if (userRepository.findByUsername("admin").isEmpty()) {
-            // Load ADMIN role trong cùng transaction
-            RoleEntity adminRole = roleRepository.findById(Role.ADMIN.name())
-                    .orElseThrow(() -> new RuntimeException("ADMIN role not found"));
-
-            Set<RoleEntity> roles = new HashSet<>();
-            roles.add(adminRole);
-
-            UserEntity admin = UserEntity.builder()
-                    .username("admin")
-                    .password(passwordEncoder.encode("admin"))
-                    .roles(roles)
-                    .build();
-
-            userRepository.save(admin);
-
-            log.warn("==========================================================");
-            log.warn("Admin user has been created with default credentials:");
-            log.warn("Username: admin");
-            log.warn("Password: admin");
-            log.warn("PLEASE CHANGE PASSWORD IMMEDIATELY!");
-            log.warn("==========================================================");
-        } else {
+        if (userRepository.existsByUsername("admin")) {
             log.info("Admin user already exists");
+            return;
         }
+
+        // Load ADMIN role trong cùng transaction
+        RoleEntity adminRole = roleRepository.findById(Role.ADMIN.name())
+                .orElseThrow(() -> new RuntimeException("ADMIN role not found. Please check Role enum."));
+
+        Set<RoleEntity> roles = new HashSet<>();
+        roles.add(adminRole);
+
+        UserEntity admin = UserEntity.builder()
+                .username("admin")
+                .password(passwordEncoder.encode("admin"))
+                .email("admin@stydu4.com")
+                .firstName("System")
+                .lastName("Administrator")
+                .authProvider(AuthProvider.LOCAL)
+                .roles(roles)
+                .build();
+
+        userRepository.save(admin);
+
+        log.warn("╔════════════════════════════════════════════════════════╗");
+        log.warn("║        DEFAULT ADMIN USER CREATED                      ║");
+        log.warn("╠════════════════════════════════════════════════════════╣");
+        log.warn("║  Username: admin                                       ║");
+        log.warn("║  Password: admin                                       ║");
+        log.warn("║  Email:    admin@stydu4.com                            ║");
+        log.warn("╠════════════════════════════════════════════════════════╣");
+        log.warn("║  SECURITY WARNING:                                     ║");
+        log.warn("║  Please change the default password immediately!       ║");
+        log.warn("╚════════════════════════════════════════════════════════╝");
     }
 }

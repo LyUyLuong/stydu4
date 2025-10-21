@@ -22,13 +22,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Time;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-
 
 @Service
 @RequiredArgsConstructor
@@ -87,35 +84,10 @@ public class ExamServiceImpl implements IExamService {
         }
 
         List<PartQuestionsDetail> partDetails = parts.stream()
-                .map(part -> {
-                    List<QuestionTestDetailResponse> questions = part.getQuestions().stream()
-                            .map(questionTestMapper::toQuestionDetailResponse)
-                            .collect(Collectors.toList());
-
-                    List<QuestionGroupDetailResponse> questionGroups = part.getQuestionGroups().stream()
-                            .map(questionGroupMapper::toQuestionGroupDetailResponse)
-                            .collect(Collectors.toList());
-
-                    return PartQuestionsDetail.builder()
-                            .partId(part.getId())
-                            .partName(part.getName())
-                            .partType(part.getType().name())
-                            .description(part.getDescription())
-                            .questions(questions)
-                            .questionGroups(questionGroups)
-                            .build();
-                })
+                .map(this::mapPartToDetail)
                 .collect(Collectors.toList());
 
-        Integer totalQuestions = parts.stream()
-                .mapToInt(part -> {
-                    Integer directQuestions = part.getQuestions().size();
-                    Integer groupQuestions = part.getQuestionGroups().stream()
-                            .mapToInt(qg -> qg.getQuestions().size())
-                            .sum();
-                    return directQuestions + groupQuestions;
-                })
-                .sum();
+        Integer totalQuestions = calculateTotalQuestions(parts);
 
         return ExamQuestionsResponse.builder()
                 .testId(test.getId())
@@ -137,14 +109,142 @@ public class ExamServiceImpl implements IExamService {
 
         LocalDateTime startTime = LocalDateTime.now();
 
-        // Validate test and user
+        // 1. Load and validate exam context
+        ExamContext context = loadExamContext(request, userName);
+
+        // 2. Create result entity to get ID
+        ResultEntity savedResult = createInitialResult(context);
+
+        // 3. Load answer cache for batch processing
+        Map<String, AnswerEntity> answerCache = loadAnswerCache(request.getAnswers());
+
+        // 4. Process all questions
+        ExamProcessingResult processingResult = processAllQuestions(
+                context, savedResult, answerCache, request.getAnswers()
+        );
+
+        // 5. Calculate scores
+        ExamScores scores = calculateScores(processingResult, context.isFullTest());
+
+        // 6. Update and save results
+        Duration duration = Duration.between(startTime, LocalDateTime.now());
+        updateAndSaveResults(savedResult, processingResult, scores, duration);
+
+        // 7. Save part results
+        savePartResults(savedResult, processingResult.getPartResultsMap());
+
+        // 8. Build and return response
+        log.info("=== EXAM SUBMISSION COMPLETED ===");
+        log.info("Mode: {}, Total Score: {}, Result ID: {}",
+                context.isFullTest() ? "FULL TEST" : "PARTIAL TEST",
+                scores.getTotalScore(),
+                savedResult.getId());
+
+        return buildExamResponse(context, savedResult, processingResult, scores, duration);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExamResultResponse getExamResult(String resultId, String userName) {
+        log.info("Fetching exam result: {} for user: {}", resultId, userName);
+
+        ResultEntity result = resultRepository.findById(resultId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESULT_NOT_FOUND));
+
+        if (!result.getUser().getUsername().equals(userName)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        List<UserAnswerEntity> userAnswers = userAnswerRepository.findByResultId(resultId);
+        List<QuestionResultDetail> questionResults = mapToQuestionResults(userAnswers);
+        List<PartResultDetail> partResults = mapToPartResults(result.getResultHaveParts());
+        List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
+
+        Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
+        Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
+
+        return ExamResultResponse.builder()
+                .resultId(result.getId())
+                .testId(result.getTest().getId())
+                .testName(result.getTest().getName())
+                .userId(result.getUser().getId())
+                .userName(result.getUser().getUsername())
+                .isFullTest(result.getIsFullTest())
+                .completedPartIds(completedPartIds)
+                .totalScore(totalScore)
+                .listeningScore(result.getListeningPoint())
+                .readingScore(result.getReadingPoint())
+                .totalCorrectAnswers(totalCorrect)
+                .listeningCorrectAnswers(result.getListeningCorrectAnswer())
+                .readingCorrectAnswers(result.getReadingCorrectAnswer())
+                .totalQuestions(result.getTotalQuestions())
+                .listeningQuestions(null)
+                .readingQuestions(null)
+                .completeTime(formatDuration(result.getCompleteTime()))
+                .partResults(partResults)
+                .questionResults(questionResults)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExamResultResponse> getUserExamResults(String testId, String userName) {
+        log.info("Fetching all results for test: {} and user: {}", testId, userName);
+
+        TestEntity test = testRepository.findById(testId)
+                .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
+
+        UserEntity user = userRepository.findByUsername(userName)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        List<ResultEntity> results = resultRepository
+                .findByTestIdAndUserUsernameOrderByCreatedDateDesc(testId, userName);
+
+        return results.stream()
+                .map(this::mapToExamResultResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =============== PRIVATE HELPER METHODS ===============
+
+    private PartQuestionsDetail mapPartToDetail(PartTestEntity part) {
+        List<QuestionTestDetailResponse> questions = part.getQuestions().stream()
+                .map(questionTestMapper::toQuestionDetailResponse)
+                .collect(Collectors.toList());
+
+        List<QuestionGroupDetailResponse> questionGroups = part.getQuestionGroups().stream()
+                .map(questionGroupMapper::toQuestionGroupDetailResponse)
+                .collect(Collectors.toList());
+
+        return PartQuestionsDetail.builder()
+                .partId(part.getId())
+                .partName(part.getName())
+                .partType(part.getType().name())
+                .description(part.getDescription())
+                .questions(questions)
+                .questionGroups(questionGroups)
+                .build();
+    }
+
+    private Integer calculateTotalQuestions(List<PartTestEntity> parts) {
+        return parts.stream()
+                .mapToInt(part -> {
+                    int directQuestions = part.getQuestions().size();
+                    int groupQuestions = part.getQuestionGroups().stream()
+                            .mapToInt(qg -> qg.getQuestions().size())
+                            .sum();
+                    return directQuestions + groupQuestions;
+                })
+                .sum();
+    }
+
+    private ExamContext loadExamContext(SubmitExamRequest request, String userName) {
         TestEntity test = testRepository.findById(request.getTestId())
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
         UserEntity user = userRepository.findByUsername(userName)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        // Determine full test or partial
         List<PartTestEntity> submittedParts;
         boolean isFullTest;
 
@@ -165,20 +265,54 @@ public class ExamServiceImpl implements IExamService {
             log.info("Mode: PARTIAL TEST with {} parts", submittedParts.size());
         }
 
-        // Create user answer map và validate
-        Map<String, String> userAnswerMap = request.getAnswers().stream()
+        if (submittedParts.isEmpty()) {
+            throw new AppException(ErrorCode.PART_TEST_NOT_FOUND);
+        }
+
+        return new ExamContext(test, user, submittedParts, isFullTest);
+    }
+
+    private ResultEntity createInitialResult(ExamContext context) {
+        ResultEntity result = ResultEntity.builder()
+                .type(context.getTest().getType())
+                .isFullTest(context.isFullTest())
+                .user(context.getUser())
+                .test(context.getTest())
+                .build();
+
+        ResultEntity savedResult = resultRepository.save(result);
+        log.info("Created result entity with ID: {}", savedResult.getId());
+        return savedResult;
+    }
+
+    private Map<String, AnswerEntity> loadAnswerCache(List<UserAnswerSubmit> answers) {
+        Set<String> answerIds = answers.stream()
+                .map(UserAnswerSubmit::getAnswerId)
+                .collect(Collectors.toSet());
+
+        return answerRepository.findAllById(answerIds)
+                .stream()
+                .collect(Collectors.toMap(AnswerEntity::getId, a -> a));
+    }
+
+    private ExamProcessingResult processAllQuestions(
+            ExamContext context,
+            ResultEntity savedResult,
+            Map<String, AnswerEntity> answerCache,
+            List<UserAnswerSubmit> userAnswers
+    ) {
+        Map<String, String> userAnswerMap = userAnswers.stream()
                 .collect(Collectors.toMap(
                         UserAnswerSubmit::getQuestionId,
                         UserAnswerSubmit::getAnswerId,
                         (existing, replacement) -> {
-                            log.warn("Duplicate answer for question: {}, keeping first answer", existing);
-                            return existing; // Keep first answer if duplicate
+                            log.warn("Duplicate answer for question, keeping first");
+                            return existing;
                         }
                 ));
 
         log.info("Total user answers submitted: {}", userAnswerMap.size());
 
-        // Initialize counters
         Map<String, PartResultData> partResultsMap = new LinkedHashMap<>();
         List<QuestionResultDetail> questionResults = new ArrayList<>();
         List<UserAnswerEntity> userAnswerEntities = new ArrayList<>();
@@ -189,192 +323,198 @@ public class ExamServiceImpl implements IExamService {
         int listeningTotal = 0;
         int readingTotal = 0;
 
-        // Create ResultEntity first
-        ResultEntity result = ResultEntity.builder()
-                .type(test.getType())
-                .isFullTest(isFullTest)
-                .user(user)
-                .test(test)
-                .build();
-
-        ResultEntity savedResult = resultRepository.save(result);
-        log.info("Created result entity with ID: {}", savedResult.getId());
-
-        // Process each part
-        for (PartTestEntity part : submittedParts) {
+        for (PartTestEntity part : context.getSubmittedParts()) {
             log.info("--- Processing Part: {} ({}) ---", part.getName(), part.getType());
 
-            PartResultData partResult = new PartResultData();
-            partResult.setPartId(part.getId());
-            partResult.setPartName(part.getName());
-            partResult.setPartType(part.getType().name());
-
+            PartResultData partResult = new PartResultData(part);
             boolean isListening = isListeningPart(part.getType());
             log.info("Part type: {}, Is Listening: {}", part.getType(), isListening);
 
-            // Sử dụng Set để track processed questions và tránh duplicate
             Set<String> processedQuestionIds = new HashSet<>();
 
             // Process direct questions
             log.info("Processing {} direct questions", part.getQuestions().size());
             for (QuestionTestEntity question : part.getQuestions()) {
-                if (processedQuestionIds.contains(question.getId())) {
+                if (!processedQuestionIds.add(question.getId())) {
                     log.warn("Duplicate question detected: {}, skipping", question.getId());
                     continue;
                 }
 
                 ProcessedQuestionData data = processQuestionWithUserAnswer(
-                        question, userAnswerMap, savedResult, isListening
+                        question, userAnswerMap, answerCache, savedResult
                 );
 
                 questionResults.add(data.getQuestionResult());
                 userAnswerEntities.add(data.getUserAnswer());
-                processedQuestionIds.add(question.getId());
-
                 partResult.incrementTotal();
+
                 if (data.isCorrect()) {
                     partResult.incrementCorrect();
                     totalCorrect++;
-                    if (isListening) {
-                        listeningCorrect++;
-                    } else {
-                        readingCorrect++;
-                    }
+                    if (isListening) listeningCorrect++;
+                    else readingCorrect++;
                 }
 
-                if (isListening) {
-                    listeningTotal++;
-                } else {
-                    readingTotal++;
-                }
+                if (isListening) listeningTotal++;
+                else readingTotal++;
             }
 
             // Process question groups
             log.info("Processing {} question groups", part.getQuestionGroups().size());
             for (QuestionGroupEntity group : part.getQuestionGroups()) {
-                log.info("Group: {}, Questions: {}", group.getId(), group.getQuestions().size());
                 for (QuestionTestEntity question : group.getQuestions()) {
-                    if (processedQuestionIds.contains(question.getId())) {
-                        log.warn("Duplicate question detected in group: {}, skipping", question.getId());
+                    if (!processedQuestionIds.add(question.getId())) {
+                        log.warn("Duplicate question in group: {}, skipping", question.getId());
                         continue;
                     }
 
                     ProcessedQuestionData data = processQuestionWithUserAnswer(
-                            question, userAnswerMap, savedResult, isListening
+                            question, userAnswerMap, answerCache, savedResult
                     );
 
                     questionResults.add(data.getQuestionResult());
                     userAnswerEntities.add(data.getUserAnswer());
-                    processedQuestionIds.add(question.getId());
-
                     partResult.incrementTotal();
+
                     if (data.isCorrect()) {
                         partResult.incrementCorrect();
                         totalCorrect++;
-                        if (isListening) {
-                            listeningCorrect++;
-                        } else {
-                            readingCorrect++;
-                        }
+                        if (isListening) listeningCorrect++;
+                        else readingCorrect++;
                     }
 
-                    if (isListening) {
-                        listeningTotal++;
-                    } else {
-                        readingTotal++;
-                    }
+                    if (isListening) listeningTotal++;
+                    else readingTotal++;
                 }
             }
 
             partResult.calculateAccuracy();
             partResultsMap.put(part.getId(), partResult);
 
-            log.info("Part {} Results: {}/{} correct ({}%)",
-                    part.getName(),
-                    partResult.getCorrectCount(),
-                    partResult.getTotalCount(),
-                    String.format("%.2f", partResult.getAccuracy()));
+            log.info("Part {} Results: {}/{} correct ({:.2f}%)",
+                    part.getName(), partResult.getCorrectCount(),
+                    partResult.getTotalCount(), partResult.getAccuracy());
         }
 
-        // Log final counts
         log.info("=== FINAL COUNTS ===");
-        log.info("Total Questions: {}", listeningTotal + readingTotal);
         log.info("Listening: {}/{} correct", listeningCorrect, listeningTotal);
         log.info("Reading: {}/{} correct", readingCorrect, readingTotal);
         log.info("Total Correct: {}", totalCorrect);
 
-        // Validate totals
-        int calculatedTotal = listeningCorrect + readingCorrect;
-        if (calculatedTotal != totalCorrect) {
-            log.error("MISMATCH: calculatedTotal={}, totalCorrect={}", calculatedTotal, totalCorrect);
-            throw new AppException(ErrorCode.CALCULATION_ERROR);
-        }
+        // Save user answers in batch
+        userAnswerRepository.saveAll(userAnswerEntities);
+        log.info("Saved {} user answers", userAnswerEntities.size());
 
-        // Calculate scores
-        Integer listeningScore = 0;
-        Integer readingScore = 0;
+        return new ExamProcessingResult(
+                partResultsMap, questionResults, totalCorrect,
+                listeningCorrect, readingCorrect, listeningTotal, readingTotal
+        );
+    }
+
+    private ProcessedQuestionData processQuestionWithUserAnswer(
+            QuestionTestEntity question,
+            Map<String, String> userAnswerMap,
+            Map<String, AnswerEntity> answerCache,
+            ResultEntity result
+    ) {
+        String userAnswerId = userAnswerMap.get(question.getId());
+
+        AnswerEntity correctAnswer = question.getAnswers().stream()
+                .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
+                .findFirst()
+                .orElse(null);
+
+        AnswerEntity userAnswer = userAnswerId != null ? answerCache.get(userAnswerId) : null;
+
+        boolean isCorrect = userAnswer != null && Boolean.TRUE.equals(userAnswer.getIsCorrect());
+
+        UserAnswerEntity userAnswerEntity = UserAnswerEntity.builder()
+                .result(result)
+                .question(question)
+                .answer(userAnswer)
+                .isCorrect(isCorrect)
+                .build();
+
+        QuestionResultDetail questionResult = QuestionResultDetail.builder()
+                .questionId(question.getId())
+                .questionContent(question.getContent())
+                .userAnswerId(userAnswer != null ? userAnswer.getId() : null)
+                .userAnswerContent(userAnswer != null ? userAnswer.getContent() : "Not answered")
+                .correctAnswerId(correctAnswer != null ? correctAnswer.getId() : null)
+                .correctAnswerContent(correctAnswer != null ? correctAnswer.getContent() : null)
+                .isCorrect(isCorrect)
+                .partName(question.getPartEntity() != null ? question.getPartEntity().getName() : "")
+                .build();
+
+        return new ProcessedQuestionData(userAnswerEntity, questionResult, isCorrect);
+    }
+
+    private ExamScores calculateScores(ExamProcessingResult result, boolean isFullTest) {
+        int listeningScore = 0;
+        int readingScore = 0;
 
         if (isFullTest) {
-            listeningScore = convertToToeicScore(listeningCorrect, listeningTotal, true);
-            readingScore = convertToToeicScore(readingCorrect, readingTotal, false);
+            listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+            readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
         } else {
-            if (listeningTotal > 0) {
-                listeningScore = convertToToeicScore(listeningCorrect, listeningTotal, true);
+            if (result.getListeningTotal() > 0) {
+                listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
             }
-            if (readingTotal > 0) {
-                readingScore = convertToToeicScore(readingCorrect, readingTotal, false);
+            if (result.getReadingTotal() > 0) {
+                readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
             }
         }
 
-        Integer totalScore = listeningScore + readingScore;
-        Integer totalQuestions = listeningTotal + readingTotal;
+        int totalScore = listeningScore + readingScore;
 
         log.info("=== SCORES ===");
         log.info("Listening Score: {}", listeningScore);
         log.info("Reading Score: {}", readingScore);
         log.info("Total Score: {}", totalScore);
 
-        // Calculate completion time
-        LocalDateTime endTime = LocalDateTime.now();
-        Duration duration = Duration.between(startTime, endTime);
+        return new ExamScores(listeningScore, readingScore, totalScore);
+    }
 
+    private void updateAndSaveResults(
+            ResultEntity result,
+            ExamProcessingResult processingResult,
+            ExamScores scores,
+            Duration duration
+    ) {
+        result.setReadingPoint(scores.getReadingScore());
+        result.setListeningPoint(scores.getListeningScore());
+        result.setReadingCorrectAnswer(processingResult.getReadingCorrect());
+        result.setListeningCorrectAnswer(processingResult.getListeningCorrect());
+        result.setCompleteTime(duration);
+        result.setTotalQuestions(processingResult.getListeningTotal() + processingResult.getReadingTotal());
 
-        // Update result with calculated data
-        savedResult.setReadingPoint(readingScore);
-        savedResult.setListeningPoint(listeningScore);
-        savedResult.setReadingCorrectAnswer(readingCorrect);
-        savedResult.setListeningCorrectAnswer(listeningCorrect);
-        savedResult.setCompleteTime(duration);
-        savedResult.setTotalQuestions(totalQuestions);
-
-        resultRepository.save(savedResult);
+        resultRepository.save(result);
         log.info("Updated result entity in database");
+    }
 
-        // Save user answers in batch
-        userAnswerRepository.saveAll(userAnswerEntities);
-        log.info("Saved {} user answers", userAnswerEntities.size());
+    private void savePartResults(ResultEntity result, Map<String, PartResultData> partResultsMap) {
+        List<ResultHavePartsEntity> resultHavePartsEntities = partResultsMap.values().stream()
+                .map(partData -> ResultHavePartsEntity.builder()
+                        .result(result)
+                        .partTest(partData.getPartEntity())
+                        .correctAnswers(partData.getCorrectCount())
+                        .totalQuestions(partData.getTotalCount())
+                        .accuracy(partData.getAccuracy())
+                        .build())
+                .collect(Collectors.toList());
 
-        // Save part results
-        List<ResultHavePartsEntity> resultHavePartsEntities = new ArrayList<>();
-        for (PartResultData partData : partResultsMap.values()) {
-            PartTestEntity part = partTestRepository.findById(partData.getPartId())
-                    .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
-
-            ResultHavePartsEntity resultHavePart = ResultHavePartsEntity.builder()
-                    .result(savedResult)
-                    .partTest(part)
-                    .correctAnswers(partData.getCorrectCount())
-                    .totalQuestions(partData.getTotalCount())
-                    .accuracy(partData.getAccuracy())
-                    .build();
-
-            resultHavePartsEntities.add(resultHavePart);
-        }
         resultHavePartsRepository.saveAll(resultHavePartsEntities);
         log.info("Saved {} part results", resultHavePartsEntities.size());
+    }
 
-        // Build response
-        List<PartResultDetail> partResultsList = partResultsMap.values().stream()
+    private ExamResultResponse buildExamResponse(
+            ExamContext context,
+            ResultEntity savedResult,
+            ExamProcessingResult processingResult,
+            ExamScores scores,
+            Duration duration
+    ) {
+        List<PartResultDetail> partResultsList = processingResult.getPartResultsMap().values().stream()
                 .map(data -> PartResultDetail.builder()
                         .partId(data.getPartId())
                         .partName(data.getPartName())
@@ -385,58 +525,41 @@ public class ExamServiceImpl implements IExamService {
                         .build())
                 .collect(Collectors.toList());
 
-        List<String> completedPartIds = submittedParts.stream()
+        List<String> completedPartIds = context.getSubmittedParts().stream()
                 .map(PartTestEntity::getId)
                 .collect(Collectors.toList());
 
-        log.info("=== EXAM SUBMISSION COMPLETED ===");
-        log.info("Mode: {}, Total Score: {}, Result ID: {}",
-                isFullTest ? "FULL TEST" : "PARTIAL TEST", totalScore, savedResult.getId());
-
         return ExamResultResponse.builder()
                 .resultId(savedResult.getId())
-                .testId(test.getId())
-                .testName(test.getName())
-                .userId(user.getId())
-                .userName(user.getUsername())
-                .isFullTest(isFullTest)
+                .testId(context.getTest().getId())
+                .testName(context.getTest().getName())
+                .userId(context.getUser().getId())
+                .userName(context.getUser().getUsername())
+                .isFullTest(context.isFullTest())
                 .completedPartIds(completedPartIds)
-                .totalScore(totalScore)
-                .listeningScore(listeningScore)
-                .readingScore(readingScore)
-                .totalCorrectAnswers(totalCorrect)
-                .listeningCorrectAnswers(listeningCorrect)
-                .readingCorrectAnswers(readingCorrect)
-                .totalQuestions(totalQuestions)
-                .listeningQuestions(listeningTotal)
-                .readingQuestions(readingTotal)
+                .totalScore(scores.getTotalScore())
+                .listeningScore(scores.getListeningScore())
+                .readingScore(scores.getReadingScore())
+                .totalCorrectAnswers(processingResult.getTotalCorrect())
+                .listeningCorrectAnswers(processingResult.getListeningCorrect())
+                .readingCorrectAnswers(processingResult.getReadingCorrect())
+                .totalQuestions(processingResult.getListeningTotal() + processingResult.getReadingTotal())
+                .listeningQuestions(processingResult.getListeningTotal())
+                .readingQuestions(processingResult.getReadingTotal())
                 .completeTime((duration.toMillis() / 1000) + "s")
                 .partResults(partResultsList)
-                .questionResults(questionResults)
+                .questionResults(processingResult.getQuestionResults())
                 .build();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public ExamResultResponse getExamResult(String resultId, String userName) {
-        log.info("Fetching exam result: {} for user: {}", resultId, userName);
-
-        ResultEntity result = resultRepository.findById(resultId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESULT_NOT_FOUND));
-
-        if (!result.getUser().getUsername().equals(userName)) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
-        }
-
-        List<UserAnswerEntity> userAnswers = userAnswerRepository.findByResultId(resultId);
-
-        List<QuestionResultDetail> questionResults = userAnswers.stream()
+    private List<QuestionResultDetail> mapToQuestionResults(List<UserAnswerEntity> userAnswers) {
+        return userAnswers.stream()
                 .map(ua -> {
                     QuestionTestEntity question = ua.getQuestion();
                     AnswerEntity userAnswer = ua.getAnswer();
 
                     AnswerEntity correctAnswer = question.getAnswers().stream()
-                            .filter(AnswerEntity::getIsCorrect)
+                            .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
                             .findFirst()
                             .orElse(null);
 
@@ -453,10 +576,10 @@ public class ExamServiceImpl implements IExamService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
 
-        List<ResultHavePartsEntity> resultHaveParts = result.getResultHaveParts();
-
-        List<PartResultDetail> partResults = resultHaveParts.stream()
+    private List<PartResultDetail> mapToPartResults(List<ResultHavePartsEntity> resultHaveParts) {
+        return resultHaveParts.stream()
                 .map(rhp -> PartResultDetail.builder()
                         .partId(rhp.getPartTest().getId())
                         .partName(rhp.getPartTest().getName())
@@ -466,12 +589,18 @@ public class ExamServiceImpl implements IExamService {
                         .accuracy(rhp.getAccuracy())
                         .build())
                 .collect(Collectors.toList());
+    }
 
-        List<String> completedPartIds = resultHaveParts.stream()
+    private List<String> extractCompletedPartIds(List<ResultHavePartsEntity> resultHaveParts) {
+        return resultHaveParts.stream()
                 .map(rhp -> rhp.getPartTest().getId())
                 .collect(Collectors.toList());
+    }
 
-        // Tính toán lại từ database để đảm bảo chính xác
+    private ExamResultResponse mapToExamResultResponse(ResultEntity result) {
+        List<PartResultDetail> partResults = mapToPartResults(result.getResultHaveParts());
+        List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
+
         Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
         Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
 
@@ -490,160 +619,85 @@ public class ExamServiceImpl implements IExamService {
                 .listeningCorrectAnswers(result.getListeningCorrectAnswer())
                 .readingCorrectAnswers(result.getReadingCorrectAnswer())
                 .totalQuestions(result.getTotalQuestions())
-                .listeningQuestions(null) // Không lưu trong DB
-                .readingQuestions(null) // Không lưu trong DB
-                .completeTime(result.getCompleteTime().toString())
+                .listeningQuestions(null)
+                .readingQuestions(null)
+                .completeTime(formatDuration(result.getCompleteTime()))
                 .partResults(partResults)
-                .questionResults(questionResults)
+                .questionResults(null)
                 .build();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<ExamResultResponse> getUserExamResults(String testId, String userName) {
-        log.info("Fetching all results for test: {} and user: {}", testId, userName);
-
-        TestEntity test = testRepository.findById(testId)
-                .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
-
-        UserEntity user = userRepository.findByUsername(userName)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-
-        List<ResultEntity> results = resultRepository.findByTestIdAndUserUsernameOrderByCreatedDateDesc(testId, userName);
-
-        return results.stream()
-                .map(result -> {
-                    List<PartResultDetail> partResults = result.getResultHaveParts().stream()
-                            .map(rhp -> PartResultDetail.builder()
-                                    .partId(rhp.getPartTest().getId())
-                                    .partName(rhp.getPartTest().getName())
-                                    .partType(rhp.getPartTest().getType().name())
-                                    .correctAnswers(rhp.getCorrectAnswers())
-                                    .totalQuestions(rhp.getTotalQuestions())
-                                    .accuracy(rhp.getAccuracy())
-                                    .build())
-                            .collect(Collectors.toList());
-
-                    List<String> completedPartIds = result.getResultHaveParts().stream()
-                            .map(rhp -> rhp.getPartTest().getId())
-                            .collect(Collectors.toList());
-
-                    Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
-                    Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
-
-                    return ExamResultResponse.builder()
-                            .resultId(result.getId())
-                            .testId(result.getTest().getId())
-                            .testName(result.getTest().getName())
-                            .userId(result.getUser().getId())
-                            .userName(result.getUser().getUsername())
-                            .isFullTest(result.getIsFullTest())
-                            .completedPartIds(completedPartIds)
-                            .totalScore(totalScore)
-                            .listeningScore(result.getListeningPoint())
-                            .readingScore(result.getReadingPoint())
-                            .totalCorrectAnswers(totalCorrect)
-                            .listeningCorrectAnswers(result.getListeningCorrectAnswer())
-                            .readingCorrectAnswers(result.getReadingCorrectAnswer())
-                            .totalQuestions(result.getTotalQuestions())
-                            .listeningQuestions(null)
-                            .readingQuestions(null)
-                            .completeTime(result.getCompleteTime().toString())
-                            .partResults(partResults)
-                            .questionResults(null)
-                            .build();
-                })
-                .collect(Collectors.toList());
-    }
-
-    // =============== HELPER METHODS ===============
-
-    private ProcessedQuestionData processQuestionWithUserAnswer(
-            QuestionTestEntity question,
-            Map<String, String> userAnswerMap,
-            ResultEntity result,
-            boolean isListening
-    ) {
-        String userAnswerId = userAnswerMap.get(question.getId());
-
-        AnswerEntity correctAnswer = question.getAnswers().stream()
-                .filter(answer -> answer.getIsCorrect() != null && answer.getIsCorrect())
-                .findFirst()
-                .orElse(null);
-
-        AnswerEntity userAnswer = null;
-        if (userAnswerId != null) {
-            userAnswer = answerRepository.findById(userAnswerId).orElse(null);
-        }
-
-        boolean isCorrect = userAnswer != null &&
-                userAnswer.getIsCorrect() != null &&
-                userAnswer.getIsCorrect();
-
-        // Create UserAnswerEntity
-        UserAnswerEntity userAnswerEntity = UserAnswerEntity.builder()
-                .result(result)
-                .question(question)
-                .answer(userAnswer) // Chỉ lưu câu trả lời của user, có thể null
-                .isCorrect(isCorrect)
-                .build();
-
-        // Create QuestionResultDetail
-        QuestionResultDetail questionResult = QuestionResultDetail.builder()
-                .questionId(question.getId())
-                .questionContent(question.getContent())
-                .userAnswerId(userAnswer != null ? userAnswer.getId() : null)
-                .userAnswerContent(userAnswer != null ? userAnswer.getContent() : "Not answered")
-                .correctAnswerId(correctAnswer != null ? correctAnswer.getId() : null)
-                .correctAnswerContent(correctAnswer != null ? correctAnswer.getContent() : null)
-                .isCorrect(isCorrect)
-                .partName(question.getPartEntity() != null ? question.getPartEntity().getName() : "")
-                .build();
-
-        log.debug("Question {}: User Answer={}, Correct={}, IsCorrect={}",
-                question.getId(),
-                userAnswer != null ? userAnswer.getId() : "null",
-                correctAnswer != null ? correctAnswer.getId() : "null",
-                isCorrect);
-
-        return new ProcessedQuestionData(userAnswerEntity, questionResult, isCorrect);
-    }
-
-    private boolean isListeningPart(PartType partType) {
+    private static boolean isListeningPart(PartType partType) {
         return partType == PartType.PART_1_TOEIC ||
                 partType == PartType.PART_2_TOEIC ||
                 partType == PartType.PART_3_TOEIC ||
                 partType == PartType.PART_4_TOEIC;
     }
 
-    private Integer convertToToeicScore(Integer correctAnswers, Integer totalQuestions, boolean isListening) {
+    private Integer convertToToeicScore(int correctAnswers, int totalQuestions) {
         if (totalQuestions == 0) return 0;
 
-        // Công thức chính xác hơn dựa trên TOEIC scoring scale
         double percentage = (double) correctAnswers / totalQuestions;
-
-        // TOEIC score ranges từ 5 đến 495 cho mỗi phần
-        // Linear scaling với floor tại 5
         int baseScore = (int) Math.round(percentage * 495);
-
-        // Minimum score is 5, maximum is 495
-        int finalScore = Math.max(5, Math.min(495, baseScore));
-
-        log.debug("Score calculation - Correct: {}/{}, Percentage: {:.2f}%, Score: {}",
-                correctAnswers, totalQuestions, percentage * 100, finalScore);
-
-        return finalScore;
+        return Math.max(5, Math.min(495, baseScore));
     }
 
-    // Helper classes
+    private String formatDuration(Object completeTime) {
+        if (completeTime instanceof Duration) {
+            return ((Duration) completeTime).toMillis() / 1000 + "s";
+        } else if (completeTime instanceof Long) {
+            return ((Long) completeTime) / 1000 + "s";
+        }
+        return completeTime.toString();
+    }
+
+    // =============== HELPER CLASSES ===============
+
+    @Data
+    @AllArgsConstructor
+    private static class ExamContext {
+        private TestEntity test;
+        private UserEntity user;
+        private List<PartTestEntity> submittedParts;
+        private boolean isFullTest;
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class ExamProcessingResult {
+        private Map<String, PartResultData> partResultsMap;
+        private List<QuestionResultDetail> questionResults;
+        private int totalCorrect;
+        private int listeningCorrect;
+        private int readingCorrect;
+        private int listeningTotal;
+        private int readingTotal;
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class ExamScores {
+        private int listeningScore;
+        private int readingScore;
+        private int totalScore;
+    }
+
     @Data
     private static class PartResultData {
         private String partId;
         private String partName;
         private String partType;
+        private PartTestEntity partEntity;
         private int correctCount = 0;
         private int totalCount = 0;
         private double accuracy = 0.0;
+
+        public PartResultData(PartTestEntity part) {
+            this.partId = part.getId();
+            this.partName = part.getName();
+            this.partType = part.getType().name();
+            this.partEntity = part;
+        }
 
         public void incrementCorrect() {
             correctCount++;
@@ -655,11 +709,7 @@ public class ExamServiceImpl implements IExamService {
 
         public void calculateAccuracy() {
             if (totalCount > 0) {
-                accuracy = ((double) correctCount / totalCount) * 100.0;
-                // Round to 2 decimal places
-                accuracy = Math.round(accuracy * 100.0) / 100.0;
-            } else {
-                accuracy = 0.0;
+                accuracy = Math.round(((double) correctCount / totalCount) * 10000.0) / 100.0;
             }
         }
     }

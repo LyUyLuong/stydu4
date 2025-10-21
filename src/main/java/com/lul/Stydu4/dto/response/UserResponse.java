@@ -19,6 +19,11 @@ public class UserResponse {
     private String firstName;
     private String lastName;
     private LocalDate dob;
+    private String email;
+    private String phoneNumber;
+
+    private String authProvider;
+    private String providerId;
     private Set<RoleResponse> roles;
 
 }

@@ -1,6 +1,7 @@
 package com.lul.Stydu4.configuration;
 
 import com.lul.Stydu4.enums.Role;
+import com.lul.Stydu4.security.OAuth2LoginSuccessHandler;
 import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,21 +20,33 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final String[] PUBLIC_ENDPOINTS = {"/users","/auth/token","/auth/introspect","/auth/logout","/auth/refresh"};
+    private final String[] PUBLIC_ENDPOINTS = {
+            "/users",
+            "/auth/token",
+            "/auth/introspect",
+            "/auth/logout",
+            "/auth/refresh",
+    };
 
     private final CustomJwtDecoder jwtDecoder;
+    private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
 
     @Autowired
-    public SecurityConfig(CustomJwtDecoder jwtDecoder) {
+    public SecurityConfig(CustomJwtDecoder jwtDecoder, OAuth2LoginSuccessHandler oauth2LoginSuccessHandler) {
         this.jwtDecoder = jwtDecoder;
+        this.oauth2LoginSuccessHandler = oauth2LoginSuccessHandler;
     }
 
     @Bean
@@ -44,17 +57,25 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/oauth2/**"
                         ).permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
         );
         http.csrf(AbstractHttpConfigurer::disable);
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.oauth2ResourceServer(oauth2 ->
                 oauth2.jwt(jwtConfigurer ->
                         jwtConfigurer.decoder(jwtDecoder)
                             .jwtAuthenticationConverter(jwtConverter()))
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
+        );
+
+        // Cấu hình OAuth2 Login
+        http.oauth2Login(oauth2 -> oauth2
+                .successHandler(oauth2LoginSuccessHandler)
         );
 
         return http.build();
@@ -74,6 +95,58 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Cho phép các origin (frontend URLs)
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000",    // React
+                "http://localhost:4200",    // Angular
+                "http://localhost:5173",    // Vite
+                "http://localhost:5500",    // Live Server
+                "http://127.0.0.1:5500"     // Live Server
+        ));
+
+        // Cho phép tất cả HTTP methods
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"  // Quan trọng cho preflight request
+        ));
+
+        // Cho phép tất cả headers
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+
+        // Cho phép credentials (cookies, authorization headers)
+        configuration.setAllowCredentials(true);
+
+        // Expose headers để frontend có thể đọc
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type"
+        ));
+
+        // Cache preflight request trong 3600 giây (1 giờ)
+        configuration.setMaxAge(3600L);
+
+        // Apply CORS cho tất cả paths
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source;
     }
 
 }

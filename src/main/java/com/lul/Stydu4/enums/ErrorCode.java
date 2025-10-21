@@ -7,20 +7,25 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error",HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Uncategorized error",HttpStatus.BAD_REQUEST),
+    INVALID_CREDENTIALS(1002, "Invalid credentials",HttpStatus.UNAUTHORIZED),
 
-    USER_EXISTED(1002, "User existed",HttpStatus.BAD_REQUEST),
-    INVALID_USERNAME(1003, "Username must be at least {min} characters",HttpStatus.BAD_REQUEST),
-    INVALID_PASSWORD(1004, "Password must be at least {min} characters",HttpStatus.BAD_REQUEST),
+    USER_EXISTED(1003, "User existed",HttpStatus.BAD_REQUEST),
+    INVALID_USERNAME(1004, "Username must be at least {min} characters",HttpStatus.BAD_REQUEST),
+    INVALID_PASSWORD(1005, "Password must be at least {min} characters",HttpStatus.BAD_REQUEST),
 
-    USER_NOT_EXISTED(1005, "User not existed",HttpStatus.NOT_FOUND),
+    USER_NOT_EXISTED(1006, "User not existed",HttpStatus.NOT_FOUND),
 
-    UNAUTHENTICATED(1006, "Unauthenticated",HttpStatus.UNAUTHORIZED),
-    UNAUTHORIZED(1007, "Don't have permission",HttpStatus.FORBIDDEN),
+    UNAUTHENTICATED(1007, "Unauthenticated",HttpStatus.UNAUTHORIZED),
+    UNAUTHORIZED(1008, "Don't have permission",HttpStatus.FORBIDDEN),
 
-    INVALID_DOB(1008, "Age must be at least {min}",HttpStatus.BAD_REQUEST),
-    INVALID_REQUEST_BODY(1009, "Request body is invalid or missing", HttpStatus.BAD_REQUEST),
+    INVALID_DOB(1009, "Age must be at least {min}",HttpStatus.BAD_REQUEST),
+    INVALID_REQUEST_BODY(1010, "Request body is invalid or missing", HttpStatus.BAD_REQUEST),
 
-    USERNAME_REQUIRED(1010, "Username is required", HttpStatus.BAD_REQUEST),
+    USERNAME_REQUIRED(1011, "Username is required", HttpStatus.BAD_REQUEST),
+
+    EMAIL_EXISTED(1012, "Email already exists", HttpStatus.BAD_REQUEST),
+    EMAIL_REQUIRED(1013, "Email is required", HttpStatus.BAD_REQUEST),
+    INVALID_EMAIL(1014, "Invalid email format", HttpStatus.BAD_REQUEST),
 
     PASSWORD_REQUIRED(1020, "Password is required", HttpStatus.BAD_REQUEST),
 
