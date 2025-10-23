@@ -3,6 +3,8 @@ package com.lul.Stydu4.service.impl;
 import com.lul.Stydu4.dto.request.Exam.SubmitExamRequest;
 import com.lul.Stydu4.dto.request.Exam.UserAnswerSubmit;
 import com.lul.Stydu4.dto.response.Exam.*;
+import com.lul.Stydu4.dto.response.Question.QuestionTestDetailResponse;
+import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupDetailResponse;
 import com.lul.Stydu4.entity.*;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.PartType;
@@ -64,6 +66,8 @@ class ExamServiceImplTest {
     @InjectMocks
     private ExamServiceImpl examService;
 
+    private static final String BASE_URL = "http://localhost:8080";
+
     private TestEntity toeicTest;
     private TestEntity ieltsTest;
     private UserEntity userEntity;
@@ -72,11 +76,21 @@ class ExamServiceImplTest {
     private QuestionTestEntity question1;
     private QuestionTestEntity question2;
     private AnswerEntity correctAnswer;
+    private AnswerEntity correctAnswer2;  // For question 2
     private AnswerEntity wrongAnswer;
     private QuestionGroupEntity questionGroup;
 
     @BeforeEach
     void setUp() {
+        // Set base URL using reflection
+        try {
+            var field = ExamServiceImpl.class.getDeclaredField("baseUrl");
+            field.setAccessible(true);
+            field.set(examService, BASE_URL);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set baseUrl", e);
+        }
+
         // Setup TOEIC test
         toeicTest = TestEntity.builder()
                 .id("test-toeic-1")
@@ -129,6 +143,12 @@ class ExamServiceImplTest {
                 .isCorrect(true)
                 .build();
 
+        correctAnswer2 = AnswerEntity.builder()
+                .id("answer-correct-2")
+                .content("Correct answer 2")
+                .isCorrect(true)
+                .build();
+
         wrongAnswer = AnswerEntity.builder()
                 .id("answer-wrong")
                 .content("Wrong answer")
@@ -147,7 +167,7 @@ class ExamServiceImplTest {
                 .id("question-2")
                 .content("Reading question")
                 .partEntity(readingPart)
-                .answers(Arrays.asList(correctAnswer, wrongAnswer))
+                .answers(Arrays.asList(correctAnswer2, wrongAnswer))
                 .build();
 
         listeningPart.getQuestions().add(question1);
@@ -295,12 +315,37 @@ class ExamServiceImplTest {
             when(testRepository.findById("test-toeic-1")).thenReturn(Optional.of(toeicTest));
             when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
                     .thenReturn(List.of(listeningPart, readingPart));
+            when(questionTestMapper.toQuestionDetailResponse(any())).thenReturn(new QuestionTestDetailResponse());
+            when(questionGroupMapper.toQuestionGroupDetailResponse(any())).thenReturn(new QuestionGroupDetailResponse());
 
             // WHEN
             ExamQuestionsResponse response = examService.getExamQuestions("test-toeic-1", null);
 
             // THEN
             assertThat(response.getTotalQuestions()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("Should include audio URL when test has audio file")
+        void getExamQuestions_WithAudioFile_Success() {
+            // GIVEN
+            FileEntity audioFile = FileEntity.builder()
+                    .id("audio-1")
+                    .originalFilename("test-audio.mp3")
+                    .build();
+
+            toeicTest.setAudio(audioFile);
+
+            when(testRepository.findById("test-toeic-1")).thenReturn(Optional.of(toeicTest));
+            when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
+                    .thenReturn(List.of(listeningPart));
+
+            // WHEN
+            ExamQuestionsResponse response = examService.getExamQuestions("test-toeic-1", null);
+
+            // THEN
+            assertThat(response.getAudioId()).isEqualTo("audio-1");
+            assertThat(response.getAudioUrl()).isEqualTo(BASE_URL + "/api/v1/files/audio-1");
         }
     }
 
@@ -322,7 +367,7 @@ class ExamServiceImplTest {
                                     .build(),
                             UserAnswerSubmit.builder()
                                     .questionId("question-2")
-                                    .answerId("answer-correct")
+                                    .answerId("answer-correct-2")
                                     .build()
                     ))
                     .build();
@@ -338,11 +383,8 @@ class ExamServiceImplTest {
             when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
             when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
                     .thenReturn(List.of(listeningPart, readingPart));
-
-            // ✅ FIX: Use findAllById for batch loading
             when(answerRepository.findAllById(anySet()))
-                    .thenReturn(List.of(correctAnswer));
-
+                    .thenReturn(List.of(correctAnswer, correctAnswer2));
             when(resultRepository.save(any(ResultEntity.class))).thenReturn(savedResult);
             when(userAnswerRepository.saveAll(anyList())).thenReturn(List.of());
             when(resultHavePartsRepository.saveAll(anyList())).thenReturn(List.of());
@@ -387,11 +429,8 @@ class ExamServiceImplTest {
             when(testRepository.findById("test-toeic-1")).thenReturn(Optional.of(toeicTest));
             when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
             when(partTestRepository.findAllById(anyList())).thenReturn(List.of(listeningPart));
-
-            // ✅ FIX: Use findAllById
             when(answerRepository.findAllById(anySet()))
                     .thenReturn(List.of(correctAnswer));
-
             when(resultRepository.save(any(ResultEntity.class))).thenReturn(savedResult);
             when(userAnswerRepository.saveAll(anyList())).thenReturn(List.of());
             when(resultHavePartsRepository.saveAll(anyList())).thenReturn(List.of());
@@ -433,11 +472,8 @@ class ExamServiceImplTest {
             when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
             when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
                     .thenReturn(List.of(listeningPart, readingPart));
-
-            // ✅ FIX: Use findAllById with wrong answer
             when(answerRepository.findAllById(anySet()))
                     .thenReturn(List.of(wrongAnswer));
-
             when(resultRepository.save(any(ResultEntity.class))).thenReturn(savedResult);
             when(userAnswerRepository.saveAll(anyList())).thenReturn(List.of());
             when(resultHavePartsRepository.saveAll(anyList())).thenReturn(List.of());
@@ -472,11 +508,8 @@ class ExamServiceImplTest {
             when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
             when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
                     .thenReturn(List.of(listeningPart, readingPart));
-
-            // ✅ FIX: Empty list for no answers
             when(answerRepository.findAllById(anySet()))
                     .thenReturn(List.of());
-
             when(resultRepository.save(any(ResultEntity.class))).thenReturn(savedResult);
             when(userAnswerRepository.saveAll(anyList())).thenReturn(List.of());
             when(resultHavePartsRepository.saveAll(anyList())).thenReturn(List.of());
@@ -525,6 +558,52 @@ class ExamServiceImplTest {
             assertThatThrownBy(() -> examService.submitExam(request, "invalid-user"))
                     .isInstanceOf(AppException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_EXISTED);
+        }
+
+        @Test
+        @DisplayName("Should calculate TOEIC score correctly for full test")
+        void submitExam_ToeicScoreCalculation_Success() {
+            // GIVEN
+            SubmitExamRequest request = SubmitExamRequest.builder()
+                    .testId("test-toeic-1")
+                    .partIds(null)
+                    .answers(List.of(
+                            UserAnswerSubmit.builder()
+                                    .questionId("question-1")
+                                    .answerId("answer-correct")
+                                    .build(),
+                            UserAnswerSubmit.builder()
+                                    .questionId("question-2")
+                                    .answerId("answer-correct-2")
+                                    .build()
+                    ))
+                    .build();
+
+            ResultEntity savedResult = ResultEntity.builder()
+                    .id("result-5")
+                    .test(toeicTest)
+                    .user(userEntity)
+                    .isFullTest(true)
+                    .build();
+
+            when(testRepository.findById("test-toeic-1")).thenReturn(Optional.of(toeicTest));
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(userEntity));
+            when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-toeic-1"))
+                    .thenReturn(List.of(listeningPart, readingPart));
+            when(answerRepository.findAllById(anySet()))
+                    .thenReturn(List.of(correctAnswer, correctAnswer2));
+            when(resultRepository.save(any(ResultEntity.class))).thenReturn(savedResult);
+            when(userAnswerRepository.saveAll(anyList())).thenReturn(List.of());
+            when(resultHavePartsRepository.saveAll(anyList())).thenReturn(List.of());
+
+            // WHEN
+            ExamResultResponse response = examService.submitExam(request, "testuser");
+
+            // THEN
+            assertThat(response.getTotalScore()).isGreaterThanOrEqualTo(5);
+            assertThat(response.getTotalScore()).isLessThanOrEqualTo(990);
+            assertThat(response.getListeningScore()).isGreaterThanOrEqualTo(5);
+            assertThat(response.getReadingScore()).isGreaterThanOrEqualTo(5);
         }
     }
 
@@ -600,6 +679,61 @@ class ExamServiceImplTest {
             assertThatThrownBy(() -> examService.getExamResult("result-1", "other-user"))
                     .isInstanceOf(AppException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("Should include audio and image URLs in question results")
+        void getExamResult_WithMediaFiles_Success() {
+            // GIVEN
+            FileEntity audioFile = FileEntity.builder()
+                    .id("audio-1")
+                    .originalFilename("question-audio.mp3")
+                    .build();
+
+            FileEntity imageFile = FileEntity.builder()
+                    .id("image-1")
+                    .originalFilename("question-image.jpg")
+                    .build();
+
+            question1.setAudio(audioFile);
+            question1.setImage(imageFile);
+
+            ResultEntity resultEntity = ResultEntity.builder()
+                    .id("result-1")
+                    .test(toeicTest)
+                    .user(userEntity)
+                    .isFullTest(true)
+                    .listeningPoint(250)
+                    .readingPoint(300)
+                    .listeningCorrectAnswer(50)
+                    .readingCorrectAnswer(60)
+                    .totalQuestions(110)
+                    .completeTime(Duration.ofMinutes(120).toMillis())
+                    .resultHaveParts(new ArrayList<>())
+                    .build();
+
+            UserAnswerEntity userAnswer = UserAnswerEntity.builder()
+                    .result(resultEntity)
+                    .question(question1)
+                    .answer(correctAnswer)
+                    .isCorrect(true)
+                    .build();
+
+            when(resultRepository.findById("result-1")).thenReturn(Optional.of(resultEntity));
+            when(userAnswerRepository.findByResultId("result-1")).thenReturn(List.of(userAnswer));
+
+            // WHEN
+            ExamResultResponse response = examService.getExamResult("result-1", "testuser");
+
+            // THEN
+            assertThat(response).isNotNull();
+            assertThat(response.getQuestionResults()).hasSize(1);
+
+            QuestionResultDetail questionResult = response.getQuestionResults().get(0);
+            assertThat(questionResult.getAudioId()).isEqualTo("audio-1");
+            assertThat(questionResult.getAudioUrl()).isEqualTo(BASE_URL + "/api/v1/files/audio-1");
+            assertThat(questionResult.getImageId()).isEqualTo("image-1");
+            assertThat(questionResult.getImageUrl()).isEqualTo(BASE_URL + "/api/v1/files/image-1");
         }
     }
 

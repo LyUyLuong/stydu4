@@ -651,10 +651,17 @@ public class ExamServiceImpl implements IExamService {
     }
 
     private Integer convertToToeicScore(int correctAnswers, int totalQuestions) {
-        if (totalQuestions == 0) return 0;
+        if (totalQuestions == 0) return 5; // Minimum score
+
         double percentage = (double) correctAnswers / totalQuestions;
-        int baseScore = (int) Math.round(percentage * 495);
-        return Math.max(5, Math.min(495, baseScore));
+        int rawScore = (int) Math.round(percentage * 495);
+
+        int scaledScore = (rawScore / 5) * 5;
+
+        if (scaledScore < 5) scaledScore = 5;
+        if (scaledScore > 495) scaledScore = 495;
+
+        return scaledScore;
     }
 
     private String formatDuration(Object completeTime) {
