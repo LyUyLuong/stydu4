@@ -20,4 +20,5 @@ public class PartTestUpdateRequest {
 
     private List<String> questionIds;
     private List<String> questionGroupsIds;
+    private String testId;
 }

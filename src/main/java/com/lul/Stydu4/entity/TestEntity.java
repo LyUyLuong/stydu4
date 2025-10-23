@@ -23,7 +23,10 @@ public class TestEntity extends BaseEntity{
     private String description;
     private Integer status;
     private Long numberOfParticipants;
-    private String audioPath;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "audio_id")
+    private FileEntity audio;
 
     @Enumerated(EnumType.STRING)
     private TestType type;

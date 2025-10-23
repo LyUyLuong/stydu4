@@ -1,6 +1,7 @@
 package com.lul.Stydu4.controller;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lul.Stydu4.dto.request.Question.QuestionTestCreateRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestSearchRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestUpdateRequest;
@@ -16,7 +17,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/question-tests")
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class QuestionTestController {
 
     IQuestionTestService questionTestService;
+    ObjectMapper objectMapper;
 
     @PostMapping
     ApiResponse<QuestionTestDetailResponse> createQuestionTest(
@@ -33,6 +38,30 @@ public class QuestionTestController {
     ) {
         return ApiResponse.<QuestionTestDetailResponse>builder()
                 .result(questionTestService.create(request))
+                .build();
+    }
+
+    @PostMapping(value = "/with-files")
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<QuestionTestDetailResponse> createQuestionWithFiles(
+            @RequestPart("data") String questionDataJson,
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) throws Exception {
+        log.info("Creating question with files - audio: {}, image: {}",
+                audio != null ? audio.getOriginalFilename() : "none",
+                image != null ? image.getOriginalFilename() : "none");
+
+        QuestionTestCreateRequest request = objectMapper.readValue(
+                questionDataJson,
+                QuestionTestCreateRequest.class
+        );
+
+        QuestionTestDetailResponse response = questionTestService
+                .createWithFiles(request, audio, image);
+
+        return ApiResponse.<QuestionTestDetailResponse>builder()
+                .result(response)
                 .build();
     }
 
@@ -82,6 +111,43 @@ public class QuestionTestController {
         questionTestService.deleteQuestionTest(questionTestId);
         return ApiResponse.<String>builder()
                 .result("QuestionTest deleted")
+                .build();
+    }
+
+
+    // ✅ Update Audio file
+    @PostMapping(value = "/{questionId}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<QuestionTestDetailResponse> updateQuestionAudio(
+            @PathVariable String questionId,
+            @RequestPart("audio") MultipartFile audio
+    ) {
+        log.info("Updating audio for question: {} with file: {}",
+                questionId, audio.getOriginalFilename());
+
+        QuestionTestDetailResponse response = questionTestService
+                .updateQuestionAudio(questionId, audio);
+
+        return ApiResponse.<QuestionTestDetailResponse>builder()
+                .result(response)
+                .build();
+    }
+
+    // ✅ Update Image file
+    @PostMapping(value = "/{questionId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<QuestionTestDetailResponse> updateQuestionImage(
+            @PathVariable String questionId,
+            @RequestPart("image") MultipartFile image
+    ) {
+        log.info("Updating image for question: {} with file: {}",
+                questionId, image.getOriginalFilename());
+
+        QuestionTestDetailResponse response = questionTestService
+                .updateQuestionImage(questionId, image);
+
+        return ApiResponse.<QuestionTestDetailResponse>builder()
+                .result(response)
                 .build();
     }
 }

@@ -39,6 +39,14 @@ public enum ErrorCode {
     INVALID_PART_TYPE(3014, "Invalid part type", HttpStatus.BAD_REQUEST),
     INVALID_PART_SELECTION(3015, "Invalid part selection", HttpStatus.BAD_REQUEST),
 
+    FILE_EMPTY(4001, "File is empty", HttpStatus.BAD_REQUEST),
+    FILE_INVALID_EXTENSION(4002, "Invalid file extension", HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(4003, "File size exceeds maximum allowed", HttpStatus.BAD_REQUEST),
+    FILE_STORE_FAILED(4004, "Failed to store file", HttpStatus.BAD_REQUEST),
+    FILE_NOT_FOUND(4005, "File not found", HttpStatus.BAD_REQUEST),
+    FILE_DELETE_FAILED(4006, "Failed to delete file", HttpStatus.BAD_REQUEST),
+    INVALID_FILE_TYPE(1031, "Invalid file type", HttpStatus.BAD_REQUEST),
+
     // Role ErrorCode
     INVALID_ROLE(4013, "Invalid role", HttpStatus.BAD_REQUEST),
 

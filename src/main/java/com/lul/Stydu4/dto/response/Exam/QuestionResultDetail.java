@@ -12,6 +12,13 @@ public class QuestionResultDetail {
 
     String questionId;
     String questionContent;
+
+    String audioId;
+    String audioUrl;
+
+    String imageId;
+    String imageUrl;
+
     String userAnswerId;
     String userAnswerContent;
     String correctAnswerId;

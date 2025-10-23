@@ -18,8 +18,10 @@ public class QuestionTestUpdateRequest {
     private String name;
     private String content;
     private String type;
-    private String audioPath;
-    private String image;
+
+    private String imageId;
+    private String audioId;
+
     private String description;
 
     private String questionGroupId;

@@ -29,8 +29,14 @@ public class QuestionTestEntity extends BaseEntity{
     @Enumerated(EnumType.STRING)
     private QuestionType type;
 
-    private String audioPath;
-    private String image;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "image_id")
+    private FileEntity image;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "audio_id")
+    private FileEntity audio;
+
     private String description;
 
 

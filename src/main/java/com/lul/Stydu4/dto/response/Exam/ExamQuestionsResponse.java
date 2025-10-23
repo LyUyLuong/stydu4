@@ -2,7 +2,6 @@ package com.lul.Stydu4.dto.response.Exam;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.util.List;
 
 @Data
@@ -11,16 +10,17 @@ import java.util.List;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ExamQuestionsResponse {
-
     String testId;
     String testName;
     String testType;
     String description;
 
-    // Thông tin về chế độ thi
+    String audioId;
+    String audioUrl;
+
+    // Exam mode info
     Boolean isFullTest;
     List<String> selectedPartIds;
-
     Integer totalQuestions;
 
     List<PartQuestionsDetail> parts;

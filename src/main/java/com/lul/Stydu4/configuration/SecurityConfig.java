@@ -23,6 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.multipart.support.MultipartFilter;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Arrays;
@@ -60,6 +61,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/oauth2/**"
                         ).permitAll()
+                        .requestMatchers("/api/v1/files/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
         );
@@ -89,6 +91,13 @@ public class SecurityConfig {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwtGrantedAuthoritiesConverter);
         return converter;
+    }
+
+    @Bean
+    public MultipartFilter multipartFilter() {
+        MultipartFilter multipartFilter = new MultipartFilter();
+        multipartFilter.setMultipartResolverBeanName("multipartResolver");
+        return multipartFilter;
     }
 
 

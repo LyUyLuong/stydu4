@@ -2,6 +2,7 @@ package com.lul.Stydu4.repository;
 
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +19,8 @@ public interface IQuestionGroupRepository extends JpaRepository<QuestionGroupEnt
             "where qg.partEntity.id in :partIds " +
             "group by qg.partEntity.id")
     List<Object[]> countQuestionGroupsByPartIds(@Param("partIds") List<String> partIds);
+
+    @EntityGraph(attributePaths = {"audio", "image", "questions", "questions.audio", "questions.image"})
+    @Override
+    java.util.List<QuestionGroupEntity> findAll();
 }

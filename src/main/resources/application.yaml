@@ -1,14 +1,16 @@
 server:
   port: 8080
+
 app:
   frontend:
     url: http://localhost:5500  # URL của frontend
+    base-url: http://localhost:8080
 
 spring:
   application:
     name: Stydu4
   datasource:
-    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
 
     username: root
     password: luong123
@@ -20,7 +22,7 @@ spring:
       ddl-auto: update
       #ddl-auto: create-drop
     properties:
-        format_sql: true
+      format_sql: true
     show-sql: true
   data:
     redis:
@@ -37,6 +39,13 @@ spring:
             scope:
               - email
               - profile
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 200MB
+      file-size-threshold: 2MB
+
 jwt:
   signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
   valid-duration: 36000 # in seconds
@@ -53,3 +62,14 @@ logging:
     org:
       springframework:
         security=DEBUG:
+
+file:
+  storage:
+    location: D:/toeic-storage  # Change to your path
+  upload:
+    images:
+      allowed-extensions: jpg,jpeg,png,gif,webp,svg
+      max-size: 5MB
+    audio:
+      allowed-extensions: mp3,wav,m4a,ogg,aac
+      max-size: 100MB

@@ -8,6 +8,7 @@ import com.lul.Stydu4.dto.response.Test.TestDetailResponse;
 import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -22,4 +23,14 @@ public interface ITestService {
     PageResponse<TestSummaryResponse> getAllTests(int page, int size);
 
     PageResponse<TestSummaryResponse> searchTests(@Valid TestSearchRequest request, Pageable pageable);
+
+    /**
+     * Create test with audio file upload
+     */
+    TestDetailResponse createWithAudio(TestCreationRequest request, MultipartFile audio);
+
+    /**
+     * Update test audio file
+     */
+    TestDetailResponse updateTestAudio(String testId, MultipartFile audio);
 }

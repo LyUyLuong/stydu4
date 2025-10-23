@@ -2,6 +2,7 @@ package com.lul.Stydu4.repository;
 
 import com.lul.Stydu4.entity.QuestionTestEntity;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +19,8 @@ public interface IQuestionTestRepository extends JpaRepository<QuestionTestEntit
             "where q.partEntity.id in :partIds " +
             "group by q.partEntity.id")
     List<Object[]> countQuestionsByPartIds(@Param("partIds") List<String> partIds);
+
+    @EntityGraph(attributePaths = {"audio", "image"})
+    @Override
+    java.util.List<QuestionTestEntity> findAll();
 }

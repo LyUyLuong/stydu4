@@ -16,6 +16,10 @@ public class TestCreationRequest {
     private Integer status;
     private String type;
     private String description;
+
+    @Builder.Default
     private Long numberOfParticipants=0L;
+
+    private String audioId;
 
 }

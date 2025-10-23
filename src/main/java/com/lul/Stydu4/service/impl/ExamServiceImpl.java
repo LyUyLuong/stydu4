@@ -19,6 +19,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,20 +30,24 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@FieldDefaults(level = AccessLevel.PRIVATE)
 @Slf4j
 public class ExamServiceImpl implements IExamService {
 
-    ITestRepository testRepository;
-    IPartTestRepository partTestRepository;
-    IQuestionTestRepository questionTestRepository;
-    IAnswerRepository answerRepository;
-    IResultRepository resultRepository;
-    IResultHavePartsRepository resultHavePartsRepository;
-    IUserAnswerRepository userAnswerRepository;
-    IUserRepository userRepository;
-    QuestionTestMapper questionTestMapper;
-    QuestionGroupMapper questionGroupMapper;
+    final ITestRepository testRepository;
+    final IPartTestRepository partTestRepository;
+    final IQuestionTestRepository questionTestRepository;
+    final IAnswerRepository answerRepository;
+    final IResultRepository resultRepository;
+    final IResultHavePartsRepository resultHavePartsRepository;
+    final IUserAnswerRepository userAnswerRepository;
+    final IUserRepository userRepository;
+    final QuestionTestMapper questionTestMapper;
+    final QuestionGroupMapper questionGroupMapper;
+
+    // ✅ NEW - Base URL for file access
+    @Value("${app.base-url:http://localhost:8080}")
+    String baseUrl;
 
     @Override
     @Transactional(readOnly = true)
@@ -61,7 +66,6 @@ public class ExamServiceImpl implements IExamService {
             log.info("Loading FULL test with {} parts", parts.size());
         } else {
             parts = partTestRepository.findAllById(partIds);
-
             boolean allPartsValid = parts.stream()
                     .allMatch(part -> part.getTestEntity().getId().equals(testId));
 
@@ -71,6 +75,7 @@ public class ExamServiceImpl implements IExamService {
 
             Map<String, PartTestEntity> partMap = parts.stream()
                     .collect(Collectors.toMap(PartTestEntity::getId, p -> p));
+
             parts = partIds.stream()
                     .map(partMap::get)
                     .filter(Objects::nonNull)
@@ -94,6 +99,9 @@ public class ExamServiceImpl implements IExamService {
                 .testName(test.getName())
                 .testType(test.getType().name())
                 .description(test.getDescription())
+                // ✅ NEW - Add test audio URL
+                .audioId(test.getAudio() != null ? test.getAudio().getId() : null)
+                .audioUrl(test.getAudio() != null ? buildFileUrl(test.getAudio().getId()) : null)
                 .isFullTest(isFullTest)
                 .selectedPartIds(isFullTest ? null : partIds)
                 .totalQuestions(totalQuestions)
@@ -106,7 +114,6 @@ public class ExamServiceImpl implements IExamService {
     public ExamResultResponse submitExam(SubmitExamRequest request, String userName) {
         log.info("=== STARTING EXAM SUBMISSION ===");
         log.info("User: {}, Test: {}, Parts: {}", userName, request.getTestId(), request.getPartIds());
-
         LocalDateTime startTime = LocalDateTime.now();
 
         // 1. Load and validate exam context
@@ -207,6 +214,12 @@ public class ExamServiceImpl implements IExamService {
 
     // =============== PRIVATE HELPER METHODS ===============
 
+    // ✅ NEW - Build file URL helper
+    private String buildFileUrl(String fileId) {
+        if (fileId == null) return null;
+        return baseUrl + "/api/v1/files/" + fileId;
+    }
+
     private PartQuestionsDetail mapPartToDetail(PartTestEntity part) {
         List<QuestionTestDetailResponse> questions = part.getQuestions().stream()
                 .map(questionTestMapper::toQuestionDetailResponse)
@@ -262,6 +275,7 @@ public class ExamServiceImpl implements IExamService {
             if (!allPartsValid || submittedParts.size() != request.getPartIds().size()) {
                 throw new AppException(ErrorCode.INVALID_PART_SELECTION);
             }
+
             log.info("Mode: PARTIAL TEST with {} parts", submittedParts.size());
         }
 
@@ -390,7 +404,6 @@ public class ExamServiceImpl implements IExamService {
 
             partResult.calculateAccuracy();
             partResultsMap.put(part.getId(), partResult);
-
             log.info("Part {} Results: {}/{} correct ({:.2f}%)",
                     part.getName(), partResult.getCorrectCount(),
                     partResult.getTotalCount(), partResult.getAccuracy());
@@ -418,14 +431,12 @@ public class ExamServiceImpl implements IExamService {
             ResultEntity result
     ) {
         String userAnswerId = userAnswerMap.get(question.getId());
-
         AnswerEntity correctAnswer = question.getAnswers().stream()
                 .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
                 .findFirst()
                 .orElse(null);
 
         AnswerEntity userAnswer = userAnswerId != null ? answerCache.get(userAnswerId) : null;
-
         boolean isCorrect = userAnswer != null && Boolean.TRUE.equals(userAnswer.getIsCorrect());
 
         UserAnswerEntity userAnswerEntity = UserAnswerEntity.builder()
@@ -557,7 +568,6 @@ public class ExamServiceImpl implements IExamService {
                 .map(ua -> {
                     QuestionTestEntity question = ua.getQuestion();
                     AnswerEntity userAnswer = ua.getAnswer();
-
                     AnswerEntity correctAnswer = question.getAnswers().stream()
                             .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
                             .findFirst()
@@ -566,6 +576,12 @@ public class ExamServiceImpl implements IExamService {
                     return QuestionResultDetail.builder()
                             .questionId(question.getId())
                             .questionContent(question.getContent())
+                            // ✅ NEW - Map audio
+                            .audioId(question.getAudio() != null ? question.getAudio().getId() : null)
+                            .audioUrl(question.getAudio() != null ? buildFileUrl(question.getAudio().getId()) : null)
+                            // ✅ NEW - Map image
+                            .imageId(question.getImage() != null ? question.getImage().getId() : null)
+                            .imageUrl(question.getImage() != null ? buildFileUrl(question.getImage().getId()) : null)
                             .userAnswerId(userAnswer != null ? userAnswer.getId() : null)
                             .userAnswerContent(userAnswer != null ? userAnswer.getContent() : "Not answered")
                             .correctAnswerId(correctAnswer != null ? correctAnswer.getId() : null)
@@ -636,7 +652,6 @@ public class ExamServiceImpl implements IExamService {
 
     private Integer convertToToeicScore(int correctAnswers, int totalQuestions) {
         if (totalQuestions == 0) return 0;
-
         double percentage = (double) correctAnswers / totalQuestions;
         int baseScore = (int) Math.round(percentage * 495);
         return Math.max(5, Math.min(495, baseScore));

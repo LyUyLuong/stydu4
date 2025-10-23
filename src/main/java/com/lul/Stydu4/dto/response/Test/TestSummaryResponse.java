@@ -23,7 +23,8 @@ public class TestSummaryResponse {
     private String description;
     private Integer status;
     private Long numberOfParticipants;
-    private String audioPath;
+    private String audioId;
+    private String audioUrl;
     private String type;
     private String slug;
 

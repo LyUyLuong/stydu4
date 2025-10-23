@@ -24,9 +24,17 @@ public class QuestionGroupEntity extends BaseEntity{
     @Column(columnDefinition = "TEXT")
     private String content;
 
+//    @Enumerated(EnumType.STRING)
     private String type;
-    private String audioPath;
-    private String image;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "image_id")
+    private FileEntity image;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "audio_id")
+    private FileEntity audio;
 
     @ManyToOne
     @JoinColumn(name = "part_id")

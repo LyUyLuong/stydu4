@@ -1,5 +1,6 @@
 package com.lul.Stydu4.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lul.Stydu4.dto.request.Test.TestCreationRequest;
 import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
 import com.lul.Stydu4.dto.request.Test.TestUpdateRequest;
@@ -14,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -26,11 +30,34 @@ import java.util.List;
 public class TestController {
 
     ITestService testService;
+    ObjectMapper objectMapper;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     ApiResponse<TestDetailResponse> createTest(@RequestBody @Valid TestCreationRequest request) {
         return ApiResponse.<TestDetailResponse>builder()
                 .result(testService.create(request))
+                .build();
+    }
+
+    @PostMapping(value = "/with-files")
+//    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<TestDetailResponse> createTestWithFiles(
+            @RequestPart("data") String testDataJson,
+            @RequestPart(value = "audio", required = false) MultipartFile audio
+    ) throws Exception {
+        log.info("Creating test with audio file: {}",
+                audio != null ? audio.getOriginalFilename() : "none");
+
+        TestCreationRequest request = objectMapper.readValue(
+                testDataJson,
+                TestCreationRequest.class
+        );
+
+        TestDetailResponse response = testService.createWithAudio(request, audio);
+
+        return ApiResponse.<TestDetailResponse>builder()
+                .result(response)
                 .build();
     }
 
@@ -45,6 +72,7 @@ public class TestController {
 
 
     @GetMapping("/search-with-specification")
+    @PreAuthorize("hasRole('ADMIN')")
     ApiResponse<PageResponse<TestSummaryResponse>> getTestsBySpecification(@ModelAttribute @Valid TestSearchRequest request,
                                                                            Pageable pageable) {
         return ApiResponse.<PageResponse<TestSummaryResponse>>builder()
@@ -61,9 +89,26 @@ public class TestController {
     }
 
     @PutMapping("/{testId}")
+    @PreAuthorize("hasRole('ADMIN')")
     ApiResponse<TestDetailResponse> updateTest(@PathVariable String testId, @RequestBody @Valid TestUpdateRequest request) {
         return ApiResponse.<TestDetailResponse>builder()
                 .result(testService.update(testId, request))
+                .build();
+    }
+
+    @PostMapping(value = "/{testId}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    ApiResponse<TestDetailResponse> updateTestAudio(
+            @PathVariable String testId,
+            @RequestPart("audio") MultipartFile audio
+    ) {
+        log.info("Updating audio for test: {} with file: {}",
+                testId, audio.getOriginalFilename());
+
+        TestDetailResponse response = testService.updateTestAudio(testId, audio);
+
+        return ApiResponse.<TestDetailResponse>builder()
+                .result(response)
                 .build();
     }
 

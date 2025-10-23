@@ -7,19 +7,23 @@ import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.Question.QuestionTestDetailResponse;
 import com.lul.Stydu4.dto.response.Question.QuestionTestSummaryResponse;
 import com.lul.Stydu4.entity.AnswerEntity;
+import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import com.lul.Stydu4.entity.QuestionTestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.enums.QuestionType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.AnswerMapper;
 import com.lul.Stydu4.mapper.QuestionTestMapper;
 import com.lul.Stydu4.repository.IAnswerRepository;
+import com.lul.Stydu4.repository.IFileRepository;
 import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.IQuestionGroupRepository;
 import com.lul.Stydu4.repository.IQuestionTestRepository;
 import com.lul.Stydu4.repository.specification.QuestionTestSpecification;
+import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.IQuestionTestService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -48,8 +53,10 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
     IPartTestRepository partTestRepository;
     IQuestionGroupRepository questionGroupRepository;
     IAnswerRepository answerRepository;
+    IFileRepository fileRepository;
     QuestionTestMapper questionTestMapper;
     AnswerMapper answerMapper;
+    IFileStorageService fileStorageService;
 
     @Override
     @Transactional
@@ -66,6 +73,20 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
                 ErrorCode.INVALID_QUESTION_TYPE
         );
         questionTest.setType(questionType);
+
+        // ✅ Handle imageId if provided
+        if (request.getImageId() != null && !request.getImageId().isBlank()) {
+            FileEntity imageFile = fileRepository.findById(request.getImageId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            questionTest.setImage(imageFile);
+        }
+
+        // ✅ Handle audioId if provided
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            questionTest.setAudio(audioFile);
+        }
 
         // Set PartEntity if partId provided
         if (request.getPartId() != null && !request.getPartId().isBlank()) {
@@ -205,12 +226,18 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             existing.setType(questionType);
         }
 
-        if (request.getAudioPath() != null) {
-            existing.setAudioPath(request.getAudioPath());
+        // ✅ Handle imageId update
+        if (request.getImageId() != null && !request.getImageId().isBlank()) {
+            FileEntity imageFile = fileRepository.findById(request.getImageId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            existing.setImage(imageFile);
         }
 
-        if (request.getImage() != null) {
-            existing.setImage(request.getImage());
+        // ✅ Handle audioId update
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            existing.setAudio(audioFile);
         }
 
         if (request.getDescription() != null) {
@@ -295,5 +322,139 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         }
 
         return Sort.by(validOrders);
+    }
+
+
+    @Override
+    @Transactional
+    public QuestionTestDetailResponse createWithFiles(
+            QuestionTestCreateRequest request,
+            MultipartFile audio,
+            MultipartFile image
+    ) {
+        log.info("Creating question with files: {}", request.getName());
+
+        QuestionTestEntity entity = questionTestMapper.toQuestionTestEntity(request);
+
+        // Validate and set QuestionType
+        QuestionType questionType = validateAndConvert(
+                request.getType(),
+                QuestionType.class,
+                ErrorCode.INVALID_QUESTION_TYPE
+        );
+        entity.setType(questionType);
+
+        // Set Part (required)
+        if (request.getPartId() != null) {
+            PartTestEntity part = partTestRepository.findById(request.getPartId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
+            entity.setPartEntity(part);
+        }
+
+        // Set QuestionGroup (optional)
+        if (request.getQuestionGroupId() != null) {
+            QuestionGroupEntity group = questionGroupRepository.findById(request.getQuestionGroupId())
+                    .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
+            entity.setQuestionGroupEntity(group);
+        }
+
+        // ✅ Upload Audio file if provided
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity audioFile = fileStorageService.storeFile(audio, FileType.AUDIO, "questions");
+            entity.setAudio(audioFile);
+            log.info("Audio uploaded with ID: {}", audioFile.getId());
+        }
+
+        // ✅ Upload Image file if provided
+        if (image != null && !image.isEmpty()) {
+            FileEntity imageFile = fileStorageService.storeFile(image, FileType.IMAGE, "questions");
+            entity.setImage(imageFile);
+            log.info("Image uploaded with ID: {}", imageFile.getId());
+        }
+
+        // Save question first
+        QuestionTestEntity savedQuestion = questionTestRepository.save(entity);
+
+        // Create answers
+        if (request.getAnswers() != null && !request.getAnswers().isEmpty()) {
+            List<AnswerEntity> answers = request.getAnswers().stream()
+                    .map(answerRequest -> {
+                        AnswerEntity answer = answerMapper.toAnswerEntity(answerRequest);
+                        answer.setQuestion(savedQuestion);
+                        return answer;
+                    })
+                    .collect(Collectors.toList());
+
+            answerRepository.saveAll(answers);
+            savedQuestion.setAnswers(answers);
+        }
+
+        return questionTestMapper.toQuestionDetailResponse(savedQuestion);
+    }
+
+    @Override
+    @Transactional
+    public QuestionTestDetailResponse updateQuestionAudio(String questionTestId, MultipartFile audio) {
+        log.info("Updating audio for question: {}", questionTestId);
+
+        QuestionTestEntity question = questionTestRepository.findById(questionTestId)
+                .orElseThrow(() -> new AppException(ErrorCode.QUESTION_NOT_FOUND));
+
+        // Delete old audio if exists
+        if (question.getAudio() != null) {
+            String oldAudioId = question.getAudio().getId();
+            question.setAudio(null);
+            questionTestRepository.save(question);
+
+            try {
+                fileStorageService.deleteFile(oldAudioId);
+                log.info("Old audio deleted: {}", oldAudioId);
+            } catch (Exception e) {
+                log.warn("Failed to delete old audio: {}", oldAudioId, e);
+            }
+        }
+
+        // Upload new audio
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity newAudio = fileStorageService.storeFile(audio, FileType.AUDIO, "questions");
+            question.setAudio(newAudio);
+            log.info("New audio uploaded with ID: {}", newAudio.getId());
+        }
+
+        QuestionTestEntity saved = questionTestRepository.save(question);
+        return questionTestMapper.toQuestionDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public QuestionTestDetailResponse updateQuestionImage(String questionTestId, MultipartFile image) {
+        log.info("Updating image for question: {}", questionTestId);
+
+        QuestionTestEntity question = questionTestRepository.findById(questionTestId)
+                .orElseThrow(() -> new AppException(ErrorCode.QUESTION_NOT_FOUND));
+
+        // Delete old image if exists
+        if (question.getImage() != null) {
+            String oldImageId = question.getImage().getId();
+            question.setImage(null);
+            questionTestRepository.save(question);
+
+            try {
+                fileStorageService.deleteFile(oldImageId);
+                log.info("Old image deleted: {}", oldImageId);
+            } catch (Exception e) {
+                log.warn("Failed to delete old image: {}", oldImageId, e);
+            }
+        }
+
+        // Upload new image
+        if (image != null && !image.isEmpty()) {
+            FileEntity newImage = fileStorageService.storeFile(image, FileType.IMAGE, "questions");
+            question.setImage(newImage);
+            log.info("New image uploaded with ID: {}", newImage.getId());
+        }
+
+        QuestionTestEntity saved = questionTestRepository.save(question);
+        return questionTestMapper.toQuestionDetailResponse(saved);
     }
 }

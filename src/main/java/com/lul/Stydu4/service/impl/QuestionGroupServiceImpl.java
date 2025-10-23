@@ -1,22 +1,25 @@
 package com.lul.Stydu4.service.impl;
 
-
 import com.lul.Stydu4.dto.request.QuestionGroup.QuestionGroupCreateRequest;
 import com.lul.Stydu4.dto.request.QuestionGroup.QuestionGroupSearchRequest;
 import com.lul.Stydu4.dto.request.QuestionGroup.QuestionGroupUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupDetailResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupSummaryResponse;
+import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import com.lul.Stydu4.entity.QuestionTestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.QuestionGroupMapper;
+import com.lul.Stydu4.repository.IFileRepository;
 import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.IQuestionGroupRepository;
 import com.lul.Stydu4.repository.IQuestionTestRepository;
 import com.lul.Stydu4.repository.specification.QuestionGroupSpecification;
+import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.IQuestionGroupService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -40,7 +44,9 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     IQuestionGroupRepository questionGroupRepository;
     IPartTestRepository partTestRepository;
     IQuestionTestRepository questionTestRepository;
+    IFileRepository fileRepository;  // ✅ ADD THIS
     QuestionGroupMapper questionGroupMapper;
+    IFileStorageService fileStorageService;
 
     @Override
     @Transactional
@@ -49,8 +55,59 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
 
         QuestionGroupEntity questionGroup = questionGroupMapper.toQuestionGroupEntity(request);
 
+        // ✅ NEW: Handle imageId if provided
+        if (request.getImageId() != null && !request.getImageId().isBlank()) {
+            FileEntity imageFile = fileRepository.findById(request.getImageId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            questionGroup.setImage(imageFile);
+        }
+
+        // ✅ NEW: Handle audioId if provided
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            questionGroup.setAudio(audioFile);
+        }
 
         QuestionGroupEntity saved = questionGroupRepository.save(questionGroup);
+        log.info("Question group created successfully with id: {}", saved.getId());
+
+        return questionGroupMapper.toQuestionGroupDetailResponse(saved);
+    }
+
+
+    @Override
+    @Transactional
+    public QuestionGroupDetailResponse createWithFiles(
+            QuestionGroupCreateRequest request,
+            MultipartFile audio,
+            MultipartFile image
+    ) {
+        log.info("Creating question group with files: {}", request.getName());
+
+        QuestionGroupEntity entity = questionGroupMapper.toQuestionGroupEntity(request);
+
+        if(request.getPartId() != null) {
+            PartTestEntity part = partTestRepository.findById(request.getPartId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
+            entity.setPartEntity(part);
+        }
+
+        // ✅ Upload Audio file if provided
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity audioFile = fileStorageService.storeFile(audio, FileType.AUDIO, "question-groups");
+            entity.setAudio(audioFile);
+            log.info("Audio uploaded with ID: {}", audioFile.getId());
+        }
+
+        // ✅ Upload Image file if provided
+        if (image != null && !image.isEmpty()) {
+            FileEntity imageFile = fileStorageService.storeFile(image, FileType.IMAGE, "question-groups");
+            entity.setImage(imageFile);
+            log.info("Image uploaded with ID: {}", imageFile.getId());
+        }
+
+        QuestionGroupEntity saved = questionGroupRepository.save(entity);
         log.info("Question group created successfully with id: {}", saved.getId());
 
         return questionGroupMapper.toQuestionGroupDetailResponse(saved);
@@ -87,7 +144,7 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
         log.info("Searching question groups with criteria: {}", request);
 
         Specification<QuestionGroupEntity> spec = QuestionGroupSpecification.buildSpecification(request);
-        Page<QuestionGroupEntity> questionGroupPage = questionGroupRepository.findAll(spec,pageable);
+        Page<QuestionGroupEntity> questionGroupPage = questionGroupRepository.findAll(spec, pageable);
 
         List<QuestionGroupSummaryResponse> responses = questionGroupPage.getContent()
                 .stream()
@@ -138,17 +195,31 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
             existing.setType(request.getType());
         }
 
-        if (request.getAudioPath() != null) {
-            existing.setAudioPath(request.getAudioPath());
+        // ❌ OLD: Remove these
+        // if (request.getAudioPath() != null) {
+        //     existing.setAudioPath(request.getAudioPath());
+        // }
+        // if (request.getImage() != null) {
+        //     existing.setImage(request.getImage());
+        // }
+
+        // ✅ NEW: Handle imageId update
+        if (request.getImageId() != null && !request.getImageId().isBlank()) {
+            FileEntity imageFile = fileRepository.findById(request.getImageId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            existing.setImage(imageFile);
         }
 
-        if (request.getImage() != null) {
-            existing.setImage(request.getImage());
+        // ✅ NEW: Handle audioId update
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND));
+            existing.setAudio(audioFile);
         }
 
         // Update PartEntity relationship
         if (request.getPartId() != null) {
-            PartTestEntity part = partTestRepository.findById(request.getPartId().toString())
+            PartTestEntity part = partTestRepository.findById(request.getPartId())
                     .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
             existing.setPartEntity(part);
         }
@@ -187,5 +258,71 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
 
         questionGroupRepository.deleteById(questionGroupId);
         log.info("Question group deleted successfully with id: {}", questionGroupId);
+    }
+
+    @Override
+    @Transactional
+    public QuestionGroupDetailResponse updateGroupAudio(String questionGroupId, MultipartFile audio) {
+        log.info("Updating audio for question group: {}", questionGroupId);
+
+        QuestionGroupEntity group = questionGroupRepository.findById(questionGroupId)
+                .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
+
+        // Delete old audio if exists
+        if (group.getAudio() != null) {
+            String oldAudioId = group.getAudio().getId();
+            group.setAudio(null);
+            questionGroupRepository.save(group);
+
+            try {
+                fileStorageService.deleteFile(oldAudioId);
+                log.info("Old audio deleted: {}", oldAudioId);
+            } catch (Exception e) {
+                log.warn("Failed to delete old audio: {}", oldAudioId, e);
+            }
+        }
+
+        // Upload new audio
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity newAudio = fileStorageService.storeFile(audio, FileType.AUDIO, "question-groups");
+            group.setAudio(newAudio);
+            log.info("New audio uploaded with ID: {}", newAudio.getId());
+        }
+
+        QuestionGroupEntity saved = questionGroupRepository.save(group);
+        return questionGroupMapper.toQuestionGroupDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public QuestionGroupDetailResponse updateGroupImage(String questionGroupId, MultipartFile image) {
+        log.info("Updating image for question group: {}", questionGroupId);
+
+        QuestionGroupEntity group = questionGroupRepository.findById(questionGroupId)
+                .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
+
+        // Delete old image if exists
+        if (group.getImage() != null) {
+            String oldImageId = group.getImage().getId();
+            group.setImage(null);
+            questionGroupRepository.save(group);
+
+            try {
+                fileStorageService.deleteFile(oldImageId);
+                log.info("Old image deleted: {}", oldImageId);
+            } catch (Exception e) {
+                log.warn("Failed to delete old image: {}", oldImageId, e);
+            }
+        }
+
+        // Upload new image
+        if (image != null && !image.isEmpty()) {
+            FileEntity newImage = fileStorageService.storeFile(image, FileType.IMAGE, "question-groups");
+            group.setImage(newImage);
+            log.info("New image uploaded with ID: {}", newImage.getId());
+        }
+
+        QuestionGroupEntity saved = questionGroupRepository.save(group);
+        return questionGroupMapper.toQuestionGroupDetailResponse(saved);
     }
 }

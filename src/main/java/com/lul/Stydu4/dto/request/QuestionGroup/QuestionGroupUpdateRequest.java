@@ -17,8 +17,9 @@ public class QuestionGroupUpdateRequest {
     private String name;
     private String content;
     private String type;
-    private String audioPath;
-    private String image;
+
+    private String imageId;
+    private String audioId;
 
     private List<String> questionIds;
     private String partId;

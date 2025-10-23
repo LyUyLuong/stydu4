@@ -27,8 +27,9 @@ public class QuestionTestCreateRequest {
     @NotBlank(message = "Question type is required")
     private String type;
 
-    private String audioPath;
-    private String image;
+    private String imageId;
+    private String audioId;
+
     private String description;
 
     private String partId;

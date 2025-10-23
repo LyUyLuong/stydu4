@@ -16,19 +16,24 @@ import java.util.List;
 public class QuestionTestDetailResponse {
 
     private String id;
-
     private String name;
     private String content;
     private String type;
-    private String audioPath;
-    private String image;
     private String description;
 
-    private String partTestId;
+    // ❌ OLD: Remove
+    // private String audioPath;
+    // private String image;
 
+    // ✅ NEW: File references
+    private String imageId;
+    private String imageUrl;
+    private String audioId;
+    private String audioUrl;
+
+    private String partTestId;
     private String questionGroupId;
 
     @Builder.Default
     private List<AnswerDetailResponse> answers = new ArrayList<>();
-
 }

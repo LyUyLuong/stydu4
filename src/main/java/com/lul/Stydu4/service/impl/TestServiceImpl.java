@@ -2,6 +2,9 @@ package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.dto.request.Test.TestCreationRequest;
 import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
+import com.lul.Stydu4.entity.FileEntity;
+import com.lul.Stydu4.enums.FileType;
+import com.lul.Stydu4.repository.IFileRepository;
 import com.lul.Stydu4.repository.specification.TestSpecification;
 import com.lul.Stydu4.dto.request.Test.TestUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
@@ -17,6 +20,7 @@ import com.lul.Stydu4.mapper.PartTestMapper;
 import com.lul.Stydu4.mapper.TestMapper;
 import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.ITestRepository;
+import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.ITestService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,6 +50,9 @@ public class TestServiceImpl implements ITestService {
     TestMapper testMapper;
     PartTestMapper partTestMapper;
 
+    IFileStorageService fileStorageService;
+    IFileRepository fileRepository;
+
     @Override
     public TestDetailResponse create(TestCreationRequest request) {
         TestEntity entity = testMapper.toTestEntity(request);
@@ -57,6 +65,31 @@ public class TestServiceImpl implements ITestService {
         entity.setType(testType);
 
         return testMapper.toTestResponse(testRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public TestDetailResponse createWithAudio(TestCreationRequest request, MultipartFile audio) {
+        log.info("Creating test with audio file: {}",
+                audio != null ? audio.getOriginalFilename() : "none");
+
+        TestEntity entity = testMapper.toTestEntity(request);
+        TestType testType = validateAndConvert(
+                request.getType(),
+                TestType.class,
+                ErrorCode.INVALID_TEST_TYPE
+        );
+        entity.setType(testType);
+
+        // Upload audio file if provided
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity audioFile = fileStorageService.storeFile(audio, FileType.AUDIO, "tests");
+            entity.setAudio(audioFile);
+            log.info("Audio uploaded with ID: {}", audioFile.getId());
+        }
+
+        TestEntity saved = testRepository.save(entity);
+        return testMapper.toTestResponse(saved);
     }
 
     @Transactional
@@ -112,6 +145,39 @@ public class TestServiceImpl implements ITestService {
         }
 
         TestEntity saved = testRepository.save(existing);
+        return testMapper.toTestResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public TestDetailResponse updateTestAudio(String testId, MultipartFile audio) {
+        log.info("Updating audio for test: {}", testId);
+
+        TestEntity test = testRepository.findById(testId)
+                .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
+
+        // Delete old audio if exists
+        if (test.getAudio() != null) {
+            String oldAudioId = test.getAudio().getId();
+            test.setAudio(null);
+            testRepository.save(test);
+
+            try {
+                fileStorageService.deleteFile(oldAudioId);
+                log.info("Old audio deleted: {}", oldAudioId);
+            } catch (Exception e) {
+                log.warn("Failed to delete old audio: {}", oldAudioId, e);
+            }
+        }
+
+        // Upload new audio
+        if (audio != null && !audio.isEmpty()) {
+            FileEntity newAudio = fileStorageService.storeFile(audio, FileType.AUDIO, "tests");
+            test.setAudio(newAudio);
+            log.info("New audio uploaded with ID: {}", newAudio.getId());
+        }
+
+        TestEntity saved = testRepository.save(test);
         return testMapper.toTestResponse(saved);
     }
 
@@ -231,5 +297,7 @@ public class TestServiceImpl implements ITestService {
 
         return Sort.by(validOrders);
     }
+
+
 
 }

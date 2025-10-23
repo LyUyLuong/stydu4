@@ -128,6 +128,12 @@ public class PartTestServiceImpl implements IPartTestService {
             }
         }
 
+        if (request.getTestId() != null) {
+            TestEntity test = testRepository.findById(request.getTestId())
+                    .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
+            existing.setTestEntity(test);
+        }   
+
         PartTestEntity updated = partTestRepository.save(existing);
         return partTestMapper.toPartTestResponse(updated);
     }
