@@ -3,9 +3,11 @@ package com.lul.Stydu4.service.impl;
 import com.lul.Stydu4.dto.request.AuthenticationRequest;
 import com.lul.Stydu4.dto.request.IntrospectRequest;
 import com.lul.Stydu4.dto.request.LogoutRequest;
+import com.lul.Stydu4.dto.request.RefreshTokenRequest;
 import com.lul.Stydu4.dto.response.AuthenticationResponse;
 import com.lul.Stydu4.dto.response.IntrospectResponse;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.AuthProvider;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.UserMapper;
@@ -26,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.text.ParseException;
@@ -45,6 +48,14 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
 
+    @NonFinal
+    @Value("${jwt.valid-duration}")
+    protected long VALID_DURATION;
+
+    @NonFinal
+    @Value("${jwt.refreshable-duration}")
+    protected long REFRESHABLE_DURATION;
+
     IUserRepository userRepository;
     UserMapper userMapper;
     IJwtBlacklistService jwtBlacklistService;
@@ -54,6 +65,10 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
         var user = userRepository.findByUsername(authenticationRequest.getUsername())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        if (user.getAuthProvider() != AuthProvider.LOCAL) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS); // Hoặc tạo error mới
+        }
 
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         boolean authenticated =  passwordEncoder.matches(authenticationRequest.getPassword(), user.getPassword());
@@ -74,8 +89,8 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         boolean isValid = true;
 
         try {
-            verify(token);
-        } catch (AppException e) {
+            verify(token,false);
+        } catch (AppException | ParseException | JOSEException e) {
             isValid = false;
         }
 
@@ -94,7 +109,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 .subject(user.getUsername())
                 .issuer("Stydu4")
                 .issueTime(new Date())
-                .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
+                .expirationTime(new Date(Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
                 .claim("scope", buildScope(user))
                 .jwtID(UUID.randomUUID().toString())
                 .build();
@@ -113,55 +128,124 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     }
 
     @Override
-    public String buildScope(UserEntity user){
+    public String buildScope(UserEntity user) {
         StringJoiner stringJoiner = new StringJoiner(" ");
 
-        if(!CollectionUtils.isEmpty(user.getRoles())){
+        if (!CollectionUtils.isEmpty(user.getRoles())) {
             user.getRoles().forEach(roleEntity -> {
-                stringJoiner.add("ROLE_"+roleEntity.getName());
-                if(!CollectionUtils.isEmpty(roleEntity.getPermissions())){
-                    roleEntity.getPermissions().forEach(permissionEntity -> {
-                        stringJoiner.add(permissionEntity.getName());
-                    });
+                stringJoiner.add("ROLE_" + roleEntity.getName());
+
+                if (roleEntity.getPermissions() != null) {
+                    try {
+                        if (!CollectionUtils.isEmpty(roleEntity.getPermissions())) {
+                            roleEntity.getPermissions().forEach(permissionEntity -> {
+                                stringJoiner.add(permissionEntity.getName());
+                            });
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not load permissions for role: {}", roleEntity.getName());
+                    }
                 }
             });
         }
 
-        log.warn(stringJoiner.toString());
+        log.info("Generated scope: {}", stringJoiner.toString());
         return stringJoiner.toString();
     }
 
     @Override
-    public void logout(LogoutRequest request) throws ParseException, JOSEException {
-        SignedJWT token = verify(request.getToken());
+    public void logout(LogoutRequest request) {
+        try {
+            SignedJWT token = verify(request.getToken(), false);
 
-        String jit = token.getJWTClaimsSet().getJWTID();
-        Date expirationTime = token.getJWTClaimsSet().getExpirationTime();
+            String jit = token.getJWTClaimsSet().getJWTID();
+            Date expirationTime = token.getJWTClaimsSet().getExpirationTime();
 
-        long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000; // Tính TTL còn lại
-        if (ttl > 0) {
-            jwtBlacklistService.blacklistToken(jit, ttl);
+            long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000;
+            if (ttl > 0) {
+                jwtBlacklistService.blacklistToken(jit, ttl);
+            }
+        } catch (Exception e) {
+            log.info("Logout called with invalid or expired token, ignoring: {}", e.getMessage());
         }
     }
 
-    private SignedJWT verify(String token) throws JOSEException, ParseException {
+    private SignedJWT verify(String token,Boolean isRefresh) throws JOSEException, ParseException {
 
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
 
-        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        Date expiryTime = isRefresh
+                ? new Date(signedJWT.getJWTClaimsSet().getIssueTime().toInstant().plus(REFRESHABLE_DURATION,ChronoUnit.SECONDS).toEpochMilli())
+                : signedJWT.getJWTClaimsSet().getExpirationTime();
 
         boolean isAuthenticated =  signedJWT.verify(verifier);
 
-        if(!isAuthenticated && expiryTime.after(new Date())){
+        if(!isAuthenticated || expiryTime.before(new Date())){
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        if (jwtBlacklistService.isTokenBlacklisted(signedJWT.getJWTClaimsSet().getJWTID()))
-            throw new AppException(ErrorCode.UNAUTHENTICATED);
+//        if (jwtBlacklistService.isTokenBlacklisted(signedJWT.getJWTClaimsSet().getJWTID()))
+//            throw new AppException(ErrorCode.UNAUTHENTICATED);
 
         return signedJWT;
 
     }
+
+    @Override
+    public AuthenticationResponse refreshToken(RefreshTokenRequest request) throws ParseException, JOSEException {
+
+        SignedJWT signedJWT = verify(request.getToken(),true);
+
+        String jit = signedJWT.getJWTClaimsSet().getJWTID();
+        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+
+        String username = signedJWT.getJWTClaimsSet().getSubject();
+        UserEntity user = userRepository.findByUsername(username).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+
+        long ttl = (expiryTime.getTime() - System.currentTimeMillis()) / 1000;
+        if (ttl > 0) {
+            jwtBlacklistService.blacklistToken(jit, ttl);
+        }
+
+        String token = generateToken(user);
+
+        return AuthenticationResponse.builder()
+                .token(token)
+                .authenticated(true)
+                .build();
+    }
+
+    // Trong AuthenticationServiceImpl
+    @Override
+    @Transactional(readOnly = true)
+    public String generateTokenForOAuth2User(UserEntity user) {
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+
+        JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
+                .subject(user.getUsername())
+                .issuer("stydu4.com")
+                .issueTime(new Date())
+                .expirationTime(new Date(
+                        Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()
+                ))
+                .jwtID(UUID.randomUUID().toString())
+                .claim("scope", buildScope(user))
+                .claim("userId", user.getId())
+                .claim("authProvider", user.getAuthProvider().name())
+                .build();
+
+        Payload payload = new Payload(jwtClaimsSet.toJSONObject());
+        JWSObject jwsObject = new JWSObject(header, payload);
+
+        try {
+            jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
+            return jwsObject.serialize();
+        } catch (JOSEException e) {
+            log.error("Cannot create token", e);
+            throw new RuntimeException(e);
+        }
+    }
+
 }

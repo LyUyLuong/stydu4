@@ -1,10 +1,12 @@
 package com.lul.Stydu4.entity;
 
+import com.lul.Stydu4.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -12,7 +14,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Builder
-public class UserEntity {
+public class UserEntity extends BaseEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,8 +23,22 @@ public class UserEntity {
     private String username;
     private String firstName;
     private String lastName;
+
+    @Column(nullable = true)
     private String password;
+
     private LocalDate dob;
+
+    private String email;
+    private String phoneNumber;
+
+    // Thêm các field mới cho OAuth2
+    @Column(name = "auth_provider")
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider; // LOCAL, GOOGLE
+
+    @Column(name = "provider_id")
+    private String providerId; // Google user ID
 
     @ManyToMany
     @JoinTable(
@@ -32,5 +48,8 @@ public class UserEntity {
     )
     private Set<RoleEntity> roles;
 
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<ResultEntity> results;
 
 }

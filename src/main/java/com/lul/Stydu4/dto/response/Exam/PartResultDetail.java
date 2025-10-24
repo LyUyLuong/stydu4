@@ -1,0 +1,19 @@
+package com.lul.Stydu4.dto.response.Exam;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class PartResultDetail {
+
+    String partId;
+    String partName;
+    String partType;
+    Integer correctAnswers;
+    Integer totalQuestions;
+    Double accuracy;
+}
