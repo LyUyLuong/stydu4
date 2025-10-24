@@ -15,10 +15,9 @@ spring:
   application:
     name: Stydu4
   datasource:
-    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
-
-    username: root
-    password: luong123
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:stydu5}?createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:luong123}
   jpa:
     database: mysql
     hibernate:
@@ -39,8 +38,8 @@ spring:
       client:
         registration:
           google:
-            client-id: 617072968798-jdhme3ske636f4qtdjs6ac6c23329b3p.apps.googleusercontent.com
-            client-secret: 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
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
@@ -52,13 +51,13 @@ spring:
       file-size-threshold: 2MB
 
 jwt:
-  signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
-  valid-duration: 36000 # in seconds
-  refreshable-duration: 36000 # in seconds
+  signerKey: ${JWT_SIGNER_KEY}
+  valid-duration: ${JWT_VALID_DURATION:36000} # in seconds
+  refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000} # in seconds
 
 # Stripe Configuration
 stripe:
-  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06  # Get from https://dashboard.stripe.com/test/apikeys
+  api-key: ${STRIPE_API_KEY}
   success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
   cancel-url: ${app.frontend.url}/payment/cancel
 
