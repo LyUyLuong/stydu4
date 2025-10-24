@@ -39,8 +39,7 @@ spring:
       client:
         registration:
           google:
-            client-id: 617072968798-jdhme3ske636f4qtdjs6ac6c23329b3p.apps.googleusercontent.com
-            client-secret: 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
+
             scope:
               - email
               - profile
