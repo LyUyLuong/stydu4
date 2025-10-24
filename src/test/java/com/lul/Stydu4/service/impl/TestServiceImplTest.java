@@ -7,25 +7,32 @@ import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
 import com.lul.Stydu4.dto.response.Test.TestDetailResponse;
 import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
+import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.TestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.enums.PartType;
 import com.lul.Stydu4.enums.TestType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.PartTestMapper;
 import com.lul.Stydu4.mapper.TestMapper;
+import com.lul.Stydu4.repository.IFileRepository;
 import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.ITestRepository;
+import com.lul.Stydu4.service.IFileStorageService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -49,6 +56,12 @@ class TestServiceImplTest {
     @Mock
     private PartTestMapper partTestMapper;
 
+    @Mock
+    private IFileStorageService fileStorageService;
+
+    @Mock
+    private IFileRepository fileRepository;
+
     @InjectMocks
     private TestServiceImpl testService;
 
@@ -59,19 +72,41 @@ class TestServiceImplTest {
     private TestDetailResponse detailResponse;
     private TestSummaryResponse summaryResponse;
     private PartTestEntity partTestEntity;
+    private FileEntity audioFile;
+    private MultipartFile mockAudioFile;
     private List<TestEntity> testList;
     private List<PartTestEntity> partList;
     private List<Object[]> countList;
 
     @BeforeEach
     void setUp() {
+        // Create FileEntity for audio
+        audioFile = FileEntity.builder()
+                .id("audio-123")
+                .originalFilename("audio.mp3")
+                .storedFilename("uuid-audio.mp3")
+                .filePath("/audios/tests/2025/10/22/uuid-audio.mp3")
+                .fileUrl("http://localhost:8080/api/v1/files/audio-123")
+                .fileType(FileType.AUDIO)
+                .fileSize(1024L)
+                .contentType("audio/mpeg")
+                .build();
+
+        // Create MockMultipartFile
+        mockAudioFile = new MockMultipartFile(
+                "audio",
+                "audio.mp3",
+                "audio/mpeg",
+                "test audio content".getBytes()
+        );
+
         testEntity = TestEntity.builder()
                 .id("test-123")
                 .name("Sample Test")
                 .description("Description")
                 .status(1)
                 .numberOfParticipants(100L)
-                .audioPath("audio.mp3")
+                .audio(audioFile)
                 .type(TestType.TOEIC)
                 .slug("sample-slug")
                 .partTestEntities(new ArrayList<>())
@@ -83,7 +118,7 @@ class TestServiceImplTest {
                 .description("Description")
                 .status(1)
                 .numberOfParticipants(100L)
-                .audioPath("audio.mp3")
+                .audio(audioFile)
                 .type(TestType.TOEIC)
                 .slug("new-slug")
                 .partTestEntities(new ArrayList<>())
@@ -105,6 +140,7 @@ class TestServiceImplTest {
                 .status(1)
                 .numberOfParticipants(100L)
                 .type("TOEIC")
+                .audioId("audio-123")
                 .build();
 
         updateRequest = TestUpdateRequest.builder()
@@ -112,7 +148,7 @@ class TestServiceImplTest {
                 .description("Updated Desc")
                 .status(2)
                 .numberOfParticipants(200L)
-                .audioPath("updated.mp3")
+                .audioId("audio-123")
                 .type("IELTS")
                 .partTestIds(List.of("part-456"))
                 .build();
@@ -123,7 +159,8 @@ class TestServiceImplTest {
                 .description("Description")
                 .status(1)
                 .numberOfParticipants(100L)
-                .audioPath("audio.mp3")
+                .audioId("audio-123")
+                .audioUrl("http://localhost:8080/api/v1/files/audio-123")
                 .type("TOEIC")
                 .slug("sample-slug")
                 .parts(new ArrayList<>())
@@ -135,7 +172,8 @@ class TestServiceImplTest {
                 .description("Description")
                 .status(1)
                 .numberOfParticipants(100L)
-                .audioPath("audio.mp3")
+                .audioId("audio-123")
+                .audioUrl("http://localhost:8080/api/v1/files/audio-123")
                 .type("TOEIC")
                 .slug("sample-slug")
                 .partsCount(0)
@@ -150,7 +188,7 @@ class TestServiceImplTest {
 
     @AfterEach
     void tearDown() {
-        reset(testRepository, partTestRepository, testMapper, partTestMapper);
+        reset(testRepository, partTestRepository, testMapper, partTestMapper, fileStorageService, fileRepository);
     }
 
     @Test
@@ -177,6 +215,52 @@ class TestServiceImplTest {
         AppException exception = assertThrows(AppException.class, () -> testService.create(creationRequest));
         assertEquals(ErrorCode.INVALID_TEST_TYPE, exception.getErrorCode());
         verify(testRepository, never()).save(any());
+    }
+
+    @Test
+    void createWithAudio_Success() {
+        when(testMapper.toTestEntity(creationRequest)).thenReturn(testEntity);
+        when(fileStorageService.storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString())).thenReturn(audioFile);
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.createWithAudio(creationRequest, mockAudioFile);
+
+        assertNotNull(result);
+        assertEquals("TOEIC", result.getType());
+        assertEquals("test-123", result.getId());
+        verify(testMapper).toTestEntity(creationRequest);
+        verify(fileStorageService).storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString());
+        verify(testRepository).save(testEntity);
+        verify(testMapper).toTestResponse(savedTestEntity);
+    }
+
+    @Test
+    void createWithAudio_NullAudio_Success() {
+        when(testMapper.toTestEntity(creationRequest)).thenReturn(testEntity);
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.createWithAudio(creationRequest, null);
+
+        assertNotNull(result);
+        verify(testMapper).toTestEntity(creationRequest);
+        verify(fileStorageService, never()).storeFile(any(), any(), any());
+        verify(testRepository).save(testEntity);
+    }
+
+    @Test
+    void createWithAudio_EmptyAudio_Success() {
+        MultipartFile emptyFile = new MockMultipartFile("audio", "", "audio/mpeg", new byte[0]);
+        when(testMapper.toTestEntity(creationRequest)).thenReturn(testEntity);
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.createWithAudio(creationRequest, emptyFile);
+
+        assertNotNull(result);
+        verify(fileStorageService, never()).storeFile(any(), any(), any());
+        verify(testRepository).save(testEntity);
     }
 
     @Test
@@ -252,6 +336,76 @@ class TestServiceImplTest {
     }
 
     @Test
+    void updateTestAudio_Success() {
+        FileEntity newAudioFile = FileEntity.builder()
+                .id("audio-456")
+                .originalFilename("new-audio.mp3")
+                .storedFilename("uuid-new-audio.mp3")
+                .filePath("/audios/tests/2025/10/22/uuid-new-audio.mp3")
+                .fileUrl("http://localhost:8080/api/v1/files/audio-456")
+                .fileType(FileType.AUDIO)
+                .fileSize(2048L)
+                .contentType("audio/mpeg")
+                .build();
+
+        when(testRepository.findById("test-123")).thenReturn(Optional.of(testEntity));
+        when(fileStorageService.storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString())).thenReturn(newAudioFile);
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.updateTestAudio("test-123", mockAudioFile);
+
+        assertNotNull(result);
+        verify(testRepository).findById("test-123");
+        verify(fileStorageService).deleteFile("audio-123"); // Delete old audio
+        verify(fileStorageService).storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString());
+        verify(testRepository, times(2)).save(testEntity); // Called twice: once to remove old audio, once to save new audio
+    }
+
+    @Test
+    void updateTestAudio_NoOldAudio_Success() {
+        testEntity.setAudio(null); // No existing audio
+        FileEntity newAudioFile = FileEntity.builder()
+                .id("audio-456")
+                .fileType(FileType.AUDIO)
+                .build();
+
+        when(testRepository.findById("test-123")).thenReturn(Optional.of(testEntity));
+        when(fileStorageService.storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString())).thenReturn(newAudioFile);
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.updateTestAudio("test-123", mockAudioFile);
+
+        assertNotNull(result);
+        verify(fileStorageService, never()).deleteFile(any()); // No old audio to delete
+        verify(fileStorageService).storeFile(eq(mockAudioFile), eq(FileType.AUDIO), anyString());
+    }
+
+    @Test
+    void updateTestAudio_TestNotFound_ThrowsException() {
+        when(testRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class, 
+                () -> testService.updateTestAudio("nonexistent", mockAudioFile));
+        assertEquals(ErrorCode.TEST_NOT_FOUND, exception.getErrorCode());
+        verify(fileStorageService, never()).storeFile(any(), any(), any());
+    }
+
+    @Test
+    void updateTestAudio_NullAudio_Success() {
+        when(testRepository.findById("test-123")).thenReturn(Optional.of(testEntity));
+        when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
+        when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+
+        TestDetailResponse result = testService.updateTestAudio("test-123", null);
+
+        assertNotNull(result);
+        verify(fileStorageService).deleteFile("audio-123"); // Delete old audio
+        verify(fileStorageService, never()).storeFile(any(), any(), any());
+    }
+
+    @Test
     void getTestById_Success() {
         testEntity.setPartTestEntities(new ArrayList<>(List.of(partTestEntity)));
         PartTestDetailResponse partResponse = new PartTestDetailResponse();
@@ -321,7 +475,7 @@ class TestServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdDate"));
         Page<TestEntity> page = new PageImpl<>(testList, pageable, 1L);
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(partTestRepository.countByTestIds(anyList())).thenReturn(countList);
         when(testMapper.toTestSummary(testEntity)).thenReturn(summaryResponse);
 
@@ -330,7 +484,7 @@ class TestServiceImplTest {
         assertEquals(1, result.getData().size());
         assertEquals(1, result.getData().get(0).getPartsCount());
         assertEquals("TOEIC", result.getData().get(0).getType());
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
         verify(partTestRepository).countByTestIds(anyList());
         verify(testMapper).toTestSummary(testEntity);
     }
@@ -341,13 +495,13 @@ class TestServiceImplTest {
         Pageable input = PageRequest.of(0, 10, Sort.unsorted());
         Page<TestEntity> emptyPage = Page.empty();
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(emptyPage);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(emptyPage);
 
         PageResponse<TestSummaryResponse> result = testService.searchTests(searchReq, input);
 
         assertEquals(0, result.getData().size());
         verify(partTestRepository, never()).countByTestIds(anyList());
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -356,14 +510,14 @@ class TestServiceImplTest {
         Pageable limited = PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "createdDate"));
         Page<TestEntity> page = new PageImpl<>(testList, limited, 1L);
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(partTestRepository.countByTestIds(anyList())).thenReturn(countList);
         when(testMapper.toTestSummary(testEntity)).thenReturn(summaryResponse);
 
         PageResponse<TestSummaryResponse> result = testService.searchTests(searchReq, PageRequest.of(0, 200, Sort.unsorted()));
 
         assertEquals(100, result.getPageSize());
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -372,13 +526,13 @@ class TestServiceImplTest {
         Pageable invalid = PageRequest.of(0, 10, Sort.by("invalidField"));
         Page<TestEntity> page = new PageImpl<>(testList, PageRequest.of(0, 10), 1L);
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(partTestRepository.countByTestIds(anyList())).thenReturn(new ArrayList<>());
         when(testMapper.toTestSummary(any(TestEntity.class))).thenReturn(summaryResponse);
 
         testService.searchTests(searchReq, invalid);
 
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -389,7 +543,7 @@ class TestServiceImplTest {
                 .build();
         Page<TestEntity> empty = Page.empty();
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(empty);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(empty);
 
         PageResponse<TestSummaryResponse> result = testService.searchTests(searchReq, PageRequest.of(0, 10));
 
@@ -405,14 +559,14 @@ class TestServiceImplTest {
                 .build();
         Page<TestEntity> page = new PageImpl<>(testList, PageRequest.of(0, 10), 1L);
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(partTestRepository.countByTestIds(anyList())).thenReturn(countList);
         when(testMapper.toTestSummary(testEntity)).thenReturn(summaryResponse);
 
         PageResponse<TestSummaryResponse> result = testService.searchTests(searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -424,13 +578,13 @@ class TestServiceImplTest {
                 .build();
         Page<TestEntity> page = new PageImpl<>(testList, PageRequest.of(0, 10), 1L);
 
-        when(testRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(testRepository.findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(partTestRepository.countByTestIds(anyList())).thenReturn(countList);
         when(testMapper.toTestSummary(testEntity)).thenReturn(summaryResponse);
 
         PageResponse<TestSummaryResponse> result = testService.searchTests(searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(testRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(testRepository).findAll(ArgumentMatchers.<Specification<TestEntity>>any(), any(Pageable.class));
     }
 }

@@ -6,6 +6,11 @@ app:
     url: http://localhost:5500  # URL của frontend
     base-url: http://localhost:8080
 
+application:
+  swagger:
+    dev-url: http://localhost:8080
+    prod-url: https://api.stydu4.com
+
 spring:
   application:
     name: Stydu4
@@ -50,18 +55,49 @@ jwt:
   signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
   valid-duration: 36000 # in seconds
   refreshable-duration: 36000 # in seconds
-#logging:
-#  level:
-#    com.lul.Stydu4: DEBUG
-#    com.lul.Stydu4.exception: DEBUG
-#    com.lul.Stydu4.converter: DEBUG
-#    org.springframework.web: DEBUG
-#    org.springframework.security: TRACE
+
+# Stripe Configuration
+stripe:
+  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06  # Get from https://dashboard.stripe.com/test/apikeys
+  success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
+  cancel-url: ${app.frontend.url}/payment/cancel
+
+# Logging Configuration
 logging:
+  file:
+    name: logs/stydu4.log
+    path: logs
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} [%t] %-40.40logger{39} : %m%n"
   level:
-    org:
-      springframework:
-        security=DEBUG:
+    # Root level
+    root: INFO
+    
+    # Application packages
+    com.lul.Stydu4: DEBUG
+    com.lul.Stydu4.controller: DEBUG
+    com.lul.Stydu4.service: DEBUG
+    com.lul.Stydu4.repository: DEBUG
+    com.lul.Stydu4.security: INFO
+    com.lul.Stydu4.exception: DEBUG
+    
+    # Spring Framework
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.springframework.boot: INFO
+    org.springframework.data: INFO
+    
+    # Hibernate/JPA
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.type: INFO
+    
+    # Redis
+    org.springframework.data.redis: INFO
+    
+    # OAuth2
+    org.springframework.security.oauth2: DEBUG
 
 file:
   storage:

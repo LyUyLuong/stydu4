@@ -7,11 +7,13 @@ import com.lul.Stydu4.dto.request.PartTest.PartTestUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
+import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.entity.PartTestEntity;
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import com.lul.Stydu4.entity.QuestionTestEntity;
 import com.lul.Stydu4.entity.TestEntity;
 import com.lul.Stydu4.enums.ErrorCode;
+import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.enums.PartType;
 import com.lul.Stydu4.enums.TestType;
 import com.lul.Stydu4.exception.AppException;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -67,6 +70,10 @@ public class PartTestServiceImplTest {
     private QuestionTestEntity question2;
     private QuestionGroupEntity group1;
     private QuestionGroupEntity group2;
+    private FileEntity audioFile1;
+    private FileEntity audioFile2;
+    private FileEntity imageFile1;
+    private FileEntity imageFile2;
     private PartTestCreationRequest creationRequest;
     private PartTestUpdateRequest updateRequest;
     private PartTestDetailResponse detailResponse;
@@ -79,6 +86,50 @@ public class PartTestServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        // Create FileEntities for audio and image
+        audioFile1 = FileEntity.builder()
+                .id("audio-q1")
+                .originalFilename("q1.mp3")
+                .storedFilename("uuid-q1.mp3")
+                .filePath("/audios/questions/q1.mp3")
+                .fileUrl("http://localhost:8080/api/v1/files/audio-q1")
+                .fileType(FileType.AUDIO)
+                .fileSize(2048L)
+                .contentType("audio/mpeg")
+                .build();
+
+        audioFile2 = FileEntity.builder()
+                .id("audio-conv1")
+                .originalFilename("conv1.mp3")
+                .storedFilename("uuid-conv1.mp3")
+                .filePath("/audios/groups/conv1.mp3")
+                .fileUrl("http://localhost:8080/api/v1/files/audio-conv1")
+                .fileType(FileType.AUDIO)
+                .fileSize(3072L)
+                .contentType("audio/mpeg")
+                .build();
+
+        imageFile1 = FileEntity.builder()
+                .id("image-q1")
+                .originalFilename("q1.jpg")
+                .storedFilename("uuid-q1.jpg")
+                .filePath("/images/questions/q1.jpg")
+                .fileUrl("http://localhost:8080/api/v1/files/image-q1")
+                .fileType(FileType.IMAGE)
+                .fileSize(5120L)
+                .contentType("image/jpeg")
+                .build();
+
+        imageFile2 = FileEntity.builder()
+                .id("image-passage1")
+                .originalFilename("passage1.jpg")
+                .storedFilename("uuid-passage1.jpg")
+                .filePath("/images/groups/passage1.jpg")
+                .fileUrl("http://localhost:8080/api/v1/files/image-passage1")
+                .fileType(FileType.IMAGE)
+                .fileSize(6144L)
+                .contentType("image/jpeg")
+                .build();
 
         testEntity = TestEntity.builder()
                 .id("test-123")
@@ -86,7 +137,7 @@ public class PartTestServiceImplTest {
                 .description("Full TOEIC Test")
                 .status(1)
                 .numberOfParticipants(1000L)
-                .audioPath("/audio/test123.mp3")
+                .audio(null)
                 .type(TestType.TOEIC)
                 .slug("toeic-practice-test")
                 .partTestEntities(new ArrayList<>())
@@ -116,8 +167,8 @@ public class PartTestServiceImplTest {
                 .id("q1")
                 .name("Question 1")
                 .content("What is shown in the picture?")
-                .audioPath("/audio/q1.mp3")
-                .image("/images/q1.jpg")
+                .audio(audioFile1)
+                .image(imageFile1)
                 .description("Picture description")
                 .partEntity(null)
                 .questionGroupEntity(null)
@@ -128,7 +179,8 @@ public class PartTestServiceImplTest {
                 .id("q2")
                 .name("Question 2")
                 .content("Where is the meeting?")
-                .audioPath("/audio/q2.mp3")
+                .audio(audioFile1)
+                .image(null)
                 .partEntity(null)
                 .questionGroupEntity(null)
                 .answers(new ArrayList<>())
@@ -139,8 +191,8 @@ public class PartTestServiceImplTest {
                 .name("Reading Passage 1")
                 .content("Lorem ipsum dolor sit amet...")
                 .type("READING")
-                .audioPath(null)
-                .image("/images/passage1.jpg")
+                .audio(null)
+                .image(imageFile2)
                 .partEntity(null)
                 .questions(new ArrayList<>())
                 .build();
@@ -150,7 +202,8 @@ public class PartTestServiceImplTest {
                 .name("Listening Conversation")
                 .content("Conversation transcript")
                 .type("LISTENING")
-                .audioPath("/audio/conv1.mp3")
+                .audio(audioFile2)
+                .image(null)
                 .partEntity(null)
                 .questions(new ArrayList<>())
                 .build();
@@ -545,7 +598,7 @@ public class PartTestServiceImplTest {
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdDate"));
         Page<PartTestEntity> page = new PageImpl<>(partTestList, pageable, 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -555,7 +608,7 @@ public class PartTestServiceImplTest {
         assertEquals(1, result.getData().size());
         assertEquals(6, result.getData().get(0).getQuestionsCount());
         assertEquals(3, result.getData().get(0).getQuestionGroupsCount());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
         verify(questionTestRepository).countQuestionsByPartIds(anyList());
         verify(questionGroupRepository).countQuestionGroupsByPartIds(anyList());
     }
@@ -569,7 +622,7 @@ public class PartTestServiceImplTest {
         Pageable input = PageRequest.of(0, 10, Sort.unsorted());
         Page<PartTestEntity> emptyPage = Page.empty();
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(emptyPage);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(emptyPage);
 
         PageResponse<PartTestSummaryResponse> result = partTestService.searchPartTests(searchReq, input);
 
@@ -587,7 +640,7 @@ public class PartTestServiceImplTest {
         Pageable limited = PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "createdDate"));
         Page<PartTestEntity> page = new PageImpl<>(partTestList, limited, 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -596,7 +649,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 200, Sort.unsorted()));
 
         assertEquals(100, result.getPageSize());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -608,14 +661,14 @@ public class PartTestServiceImplTest {
         Pageable invalid = PageRequest.of(0, 10, Sort.by("invalidField", "anotherInvalid"));
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(new ArrayList<>());
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(new ArrayList<>());
         when(partTestMapper.toPartTestSummary(any(PartTestEntity.class))).thenReturn(summaryResponse);
 
         partTestService.searchPartTests(searchReq, invalid);
 
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -627,14 +680,14 @@ public class PartTestServiceImplTest {
         Pageable unsorted = PageRequest.of(0, 10, Sort.unsorted());
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
 
         partTestService.searchPartTests(searchReq, unsorted);
 
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -646,7 +699,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -655,7 +708,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -667,7 +720,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -676,7 +729,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -689,7 +742,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -698,7 +751,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -711,14 +764,14 @@ public class PartTestServiceImplTest {
                 Sort.by(Sort.Direction.ASC, "name", "type"));
         Page<PartTestEntity> page = new PageImpl<>(partTestList, sortByName, 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
 
         partTestService.searchPartTests(searchReq, sortByName);
 
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -731,14 +784,14 @@ public class PartTestServiceImplTest {
                 Sort.by(Sort.Direction.ASC, "name", "invalidField", "status"));
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
 
         partTestService.searchPartTests(searchReq, mixed);
 
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -749,7 +802,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(new ArrayList<>());
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(new ArrayList<>());
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -773,7 +826,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -782,7 +835,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getData().size());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -793,7 +846,7 @@ public class PartTestServiceImplTest {
                 .build();
         Page<PartTestEntity> page = new PageImpl<>(partTestList, PageRequest.of(0, 10), 1L);
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(questionCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(groupCountList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -802,7 +855,7 @@ public class PartTestServiceImplTest {
                 searchReq, PageRequest.of(0, 10));
 
         assertEquals(1, result.getCurrentPage());
-        verify(partTestRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(partTestRepository).findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class));
     }
 
     @Test
@@ -837,7 +890,7 @@ public class PartTestServiceImplTest {
                 .questionGroupsCount(0)
                 .build();
 
-        when(partTestRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(partTestRepository.findAll(ArgumentMatchers.<Specification<PartTestEntity>>any(), any(Pageable.class))).thenReturn(page);
         when(questionTestRepository.countQuestionsByPartIds(anyList())).thenReturn(multiCountList);
         when(questionGroupRepository.countQuestionGroupsByPartIds(anyList())).thenReturn(multiGroupList);
         when(partTestMapper.toPartTestSummary(partTestEntity)).thenReturn(summaryResponse);
@@ -853,3 +906,4 @@ public class PartTestServiceImplTest {
         assertEquals(2, result.getData().get(1).getQuestionGroupsCount());
     }
 }
+

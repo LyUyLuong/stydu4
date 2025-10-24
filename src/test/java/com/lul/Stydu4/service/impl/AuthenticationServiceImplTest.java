@@ -352,6 +352,27 @@ class AuthenticationServiceImplTest {
             // THEN
             assertThat(scope).isEqualTo("ROLE_ADMIN");
         }
+
+        @Test
+        @DisplayName("Should handle role with empty permissions")
+        void buildScope_RoleWithEmptyPermissions_OnlyRoleScope() {
+            // GIVEN
+            RoleEntity roleWithEmptyPermissions = RoleEntity.builder()
+                    .name("MODERATOR")
+                    .permissions(new HashSet<>())
+                    .build();
+
+            UserEntity user = UserEntity.builder()
+                    .username("moderator")
+                    .roles(new HashSet<>(Set.of(roleWithEmptyPermissions)))
+                    .build();
+
+            // WHEN
+            String scope = authenticationService.buildScope(user);
+
+            // THEN
+            assertThat(scope).isEqualTo("ROLE_MODERATOR");
+        }
     }
 
     @Nested

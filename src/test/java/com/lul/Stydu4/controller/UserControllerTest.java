@@ -2,6 +2,7 @@ package com.lul.Stydu4.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lul.Stydu4.dto.request.User.UserCreationRequest;
+import com.lul.Stydu4.dto.request.User.UserUpdateRequest;
 import com.lul.Stydu4.dto.response.RoleResponse;
 import com.lul.Stydu4.dto.response.UserResponse;
 import com.lul.Stydu4.enums.AuthProvider;
@@ -24,13 +25,15 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
 @AutoConfigureMockMvc(addFilters = false)  // Disable Security filters
@@ -47,6 +50,7 @@ class UserControllerTest {
     private IUserService userService;
 
     private UserCreationRequest validCreationRequest;
+    private UserUpdateRequest validUpdateRequest;
     private UserResponse userResponse;
     private RoleResponse userRole;
 
@@ -64,6 +68,13 @@ class UserControllerTest {
                 .firstName("John")
                 .lastName("Doe")
                 .dob(LocalDate.of(1990, 1, 1))
+                .build();
+
+        validUpdateRequest = UserUpdateRequest.builder()
+                .password("newPassword123")
+                .firstName("Jane")
+                .lastName("Smith")
+                .dob(LocalDate.of(1995, 5, 5))
                 .build();
 
         userResponse = UserResponse.builder()
@@ -338,7 +349,7 @@ class UserControllerTest {
             when(userService.getUserById("user-123")).thenReturn(userResponse);
 
             // WHEN
-            ResultActions result = mockMvc.perform(get("/users/{id}", "user-123"));
+            ResultActions result = mockMvc.perform(get("/users/{userId}", "user-123"));
 
             // THEN
             result.andDo(print())
@@ -358,7 +369,7 @@ class UserControllerTest {
                     .thenThrow(new AppException(ErrorCode.USER_NOT_EXISTED));
 
             // WHEN
-            ResultActions result = mockMvc.perform(get("/users/{id}", "invalid-id"));
+            ResultActions result = mockMvc.perform(get("/users/{userId}", "invalid-id"));
 
             // THEN
             result.andDo(print())
@@ -370,7 +381,65 @@ class UserControllerTest {
     }
 
     @Nested
-    @DisplayName("DELETE /users/{id} - Delete User")
+    @DisplayName("PUT /users/{userId} - Update User")
+    class UpdateUserTests {
+
+        @Test
+        @DisplayName("Should update user successfully with valid data")
+        void updateUser_ValidRequest_Success() throws Exception {
+            // GIVEN
+            UserResponse updatedResponse = UserResponse.builder()
+                    .id("user-123")
+                    .username("john_doe")
+                    .email("john@example.com")
+                    .firstName("Jane")
+                    .lastName("Smith")
+                    .dob(LocalDate.of(1995, 5, 5))
+                    .authProvider(AuthProvider.LOCAL.name())
+                    .roles(Set.of(userRole))
+                    .build();
+
+            when(userService.updateUser(anyString(), any(UserUpdateRequest.class)))
+                    .thenReturn(updatedResponse);
+
+            // WHEN
+            ResultActions result = mockMvc.perform(put("/users/{userId}", "user-123")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(validUpdateRequest)));
+
+            // THEN
+            result.andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.id").value("user-123"))
+                    .andExpect(jsonPath("$.result.firstName").value("Jane"))
+                    .andExpect(jsonPath("$.result.lastName").value("Smith"));
+
+            verify(userService, times(1)).updateUser(eq("user-123"), any(UserUpdateRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should fail when updating non-existent user")
+        void updateUser_InvalidId_NotFound() throws Exception {
+            // GIVEN
+            when(userService.updateUser(anyString(), any(UserUpdateRequest.class)))
+                    .thenThrow(new AppException(ErrorCode.USER_NOT_EXISTED));
+
+            // WHEN
+            ResultActions result = mockMvc.perform(put("/users/{userId}", "invalid-id")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(validUpdateRequest)));
+
+            // THEN
+            result.andDo(print())
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(ErrorCode.USER_NOT_EXISTED.getCode()));
+
+            verify(userService, times(1)).updateUser(eq("invalid-id"), any(UserUpdateRequest.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /users/{userId} - Delete User")
     class DeleteUserTests {
 
         @Test
@@ -380,7 +449,7 @@ class UserControllerTest {
             doNothing().when(userService).deleteUser("user-123");
 
             // WHEN
-            ResultActions result = mockMvc.perform(delete("/users/{id}", "user-123"));
+            ResultActions result = mockMvc.perform(delete("/users/{userId}", "user-123"));
 
             // THEN
             result.andDo(print())
@@ -398,7 +467,7 @@ class UserControllerTest {
                     .when(userService).deleteUser("invalid-id");
 
             // WHEN
-            ResultActions result = mockMvc.perform(delete("/users/{id}", "invalid-id"));
+            ResultActions result = mockMvc.perform(delete("/users/{userId}", "invalid-id"));
 
             // THEN
             result.andDo(print())

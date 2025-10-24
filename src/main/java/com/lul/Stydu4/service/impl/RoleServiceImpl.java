@@ -40,17 +40,12 @@ public class RoleServiceImpl implements IRoleService {
     @Override
     public List<RoleResponse> getAllRoles() {
         List<RoleEntity> roleEntities = repository.findAll();
-        return roleEntities.stream().map(roleMapper::toRoleResponse).toList();
+        return roleEntities.stream().map(mapper::toRoleResponse).toList();
     }
 
     @Override
     public void deleteRole(String name) {
         repository.deleteById(name);
     }
-
-    IRoleRepository roleRepository;
-    RoleMapper roleMapper;
-
-
 
 }

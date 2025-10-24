@@ -262,7 +262,8 @@ class UserServiceImplTest {
             // THEN
             assertThat(result).isNotNull();
             verify(userRepository).findById("user-123");
-            verify(passwordEncoder, times(2)).encode(updateRequest.getPassword());
+            // Password is encoded once for LOCAL user with valid password
+            verify(passwordEncoder, times(1)).encode(updateRequest.getPassword());
             verify(userRepository).save(any(UserEntity.class));
         }
 
@@ -296,7 +297,8 @@ class UserServiceImplTest {
             userService.updateUser("user-123", updateRequest);
 
             // THEN
-            verify(passwordEncoder, times(2)).encode(updateRequest.getPassword());
+            // Password is encoded once for LOCAL provider with valid password
+            verify(passwordEncoder, times(1)).encode(updateRequest.getPassword());
         }
 
         @Test
@@ -315,6 +317,28 @@ class UserServiceImplTest {
             userService.updateUser("user-123", updateRequest);
 
             // THEN
+            // No encoding happens for OAuth2 user with null password
+            verify(passwordEncoder, never()).encode(anyString());
+            verify(passwordEncoder, never()).encode(null);
+        }
+
+        @Test
+        @DisplayName("Should not encode password for OAuth2 user with non-null password")
+        void updateUser_OAuth2Provider_WithPassword_SkipsEncoding() {
+            // GIVEN
+            userEntity.setAuthProvider(AuthProvider.GOOGLE);
+            updateRequest.setPassword("newPassword123");
+
+            when(userRepository.findById("user-123")).thenReturn(Optional.of(userEntity));
+            when(roleRepository.findAllById(anyList())).thenReturn(List.of(userRole));
+            when(userRepository.save(any())).thenReturn(userEntity);
+            when(userMapper.toUserResponse(any())).thenReturn(userResponse);
+
+            // WHEN
+            userService.updateUser("user-123", updateRequest);
+
+            // THEN
+            // No encoding happens for OAuth2 users (they shouldn't have passwords updated)
             verify(passwordEncoder, never()).encode(anyString());
         }
     }

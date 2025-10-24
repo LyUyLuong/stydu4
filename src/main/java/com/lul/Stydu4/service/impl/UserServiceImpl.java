@@ -78,7 +78,6 @@ public class UserServiceImpl implements IUserService {
         }
 
         userMapper.updateUserEntity(userEntity, userUpdateRequest);
-        userEntity.setPassword(passwordEncoder.encode(userUpdateRequest.getPassword()));
 
         Set<RoleEntity> roles = new HashSet<>(roleRepository.findAllById(userUpdateRequest.getRoles()));
         userEntity.setRoles(roles);

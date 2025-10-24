@@ -112,11 +112,11 @@ public class SecurityConfig {
 
         // Cho phép các origin (frontend URLs)
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",    // React
-                "http://localhost:4200",    // Angular
-                "http://localhost:5173",    // Vite
-                "http://localhost:5500",    // Live Server
-                "http://127.0.0.1:5500"     // Live Server
+                "http://localhost:3000",
+                "http://localhost:4200",    
+                "http://localhost:5173",   
+                "http://localhost:5500",    
+                "http://127.0.0.1:5500"     
         ));
 
         // Cho phép tất cả HTTP methods

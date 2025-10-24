@@ -58,7 +58,13 @@ public enum ErrorCode {
     ANSWER_NOT_FOUND(7001, "Answer not found", HttpStatus.NOT_FOUND),
 
     RESULT_NOT_FOUND(8001, "Result not found", HttpStatus.NOT_FOUND),
-    CALCULATION_ERROR(8002, "Calculation error occurred", HttpStatus.INTERNAL_SERVER_ERROR)
+    CALCULATION_ERROR(8002, "Calculation error occurred", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // Course ErrorCode
+    COURSE_NOT_FOUND(9001, "Course not found", HttpStatus.NOT_FOUND),
+    COURSE_ALREADY_PURCHASED(9002, "Course already purchased", HttpStatus.BAD_REQUEST),
+    ENROLLMENT_NOT_FOUND(9003, "Enrollment not found", HttpStatus.NOT_FOUND),
+    PAYMENT_FAILED(9004, "Payment failed", HttpStatus.BAD_REQUEST)
     ;
 
     ErrorCode(int code, String message, HttpStatus statusCode) {
