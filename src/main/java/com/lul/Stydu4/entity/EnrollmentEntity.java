@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table(name = "enrollments")
+@Table(name = "enrollments", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_user_course", columnNames = {"user_id", "course_id"})
+})
 public class EnrollmentEntity extends BaseEntity {
 
     @Id

@@ -64,6 +64,13 @@ public class CourseServiceImpl implements com.lul.Stydu4.service.ICourseService 
     }
 
     @Override
+    public List<CourseResponse> getAllCourses() {
+        return courseRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public CourseEntity getCourseEntityById(String id) {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.COURSE_NOT_FOUND));

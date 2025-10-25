@@ -172,7 +172,7 @@ public class FileStorageServiceImpl implements IFileStorageService {
 
     private String buildFileUrl(String fileId) {
         return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/v1/files/")
+                .path("/files/")
                 .path(fileId)
                 .toUriString();
     }

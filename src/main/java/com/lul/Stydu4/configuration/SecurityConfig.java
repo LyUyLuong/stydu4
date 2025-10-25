@@ -61,7 +61,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/oauth2/**"
                         ).permitAll()
-                        .requestMatchers("/api/v1/files/**").permitAll()
+                        .requestMatchers("/files/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
         );
@@ -75,9 +75,18 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
-        // Cấu hình OAuth2 Login
+        // Cấu hình OAuth2 Login - CHỈ cho phép OAuth2 trên path /oauth2/**, KHÔNG redirect tự động
         http.oauth2Login(oauth2 -> oauth2
                 .successHandler(oauth2LoginSuccessHandler)
+                .loginPage("/oauth2/authorization/google")
+                .permitAll()
+        )
+        // Tắt form login và HTTP Basic để tránh auto-redirect
+        .formLogin(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
+        // Tắt exception handling mặc định để không redirect sang login
+        .exceptionHandling(exception -> exception
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
         return http.build();

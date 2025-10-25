@@ -70,6 +70,27 @@ public class TestController {
                 .build();
     }
 
+    @GetMapping("/search")
+    ApiResponse<PageResponse<TestSummaryResponse>> searchTests(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false, value = "page", defaultValue = "1") int page,
+            @RequestParam(required = false, value = "size", defaultValue = "20") int size
+    ) {
+        TestSearchRequest request = TestSearchRequest.builder()
+                .name(name)
+                .type(type)
+                .status(1) // Only show active tests for normal users
+                .page(page)
+                .size(size)
+                .build();
+        
+        return ApiResponse.<PageResponse<TestSummaryResponse>>builder()
+                .result(testService.searchTests(request, 
+                    org.springframework.data.domain.PageRequest.of(page - 1, size)))
+                .build();
+    }
+
 
     @GetMapping("/search-with-specification")
     @PreAuthorize("hasRole('ADMIN')")

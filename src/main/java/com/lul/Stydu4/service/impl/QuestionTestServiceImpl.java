@@ -193,7 +193,13 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         QuestionTestEntity questionTest = questionTestRepository.findById(questionTestId)
                 .orElseThrow(() -> new AppException(ErrorCode.QUESTION_NOT_FOUND));
 
-        return questionTestMapper.toQuestionDetailResponse(questionTest);
+        QuestionTestDetailResponse response = questionTestMapper.toQuestionDetailResponse(questionTest);
+        
+        log.info("Question fetched - Audio: {} (URL: {}), Image: {} (URL: {})",
+                response.getAudioId(), response.getAudioUrl(),
+                response.getImageId(), response.getImageUrl());
+        
+        return response;
     }
 
     @Override
@@ -259,20 +265,25 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             existing.setQuestionGroupEntity(questionGroup);
         }
 
-        // Update Answers
-        if (request.getAnswerIds() != null && !request.getAnswerIds().isEmpty()) {
-            List<AnswerEntity> newAnswers = answerRepository.findAllById(request.getAnswerIds());
-
-            if (newAnswers.size() != request.getAnswerIds().size()) {
-                throw new AppException(ErrorCode.ANSWER_NOT_FOUND);
-            }
-
-            // Clear existing and add new
+        // ✅ Update Answers - Delete old answers and create new ones
+        if (request.getAnswers() != null && !request.getAnswers().isEmpty()) {
+            // Clear existing answers (cascade delete should handle this)
             existing.getAnswers().clear();
-            newAnswers.forEach(answer -> {
-                answer.setQuestion(existing);
-                existing.getAnswers().add(answer);
-            });
+            
+            // Create new answers
+            List<AnswerEntity> newAnswers = request.getAnswers().stream()
+                    .map(answerReq -> {
+                        AnswerEntity answer = AnswerEntity.builder()
+                                .content(answerReq.getContent())
+                                .isCorrect(answerReq.getIsCorrect())
+                                .mark(answerReq.getMark())
+                                .question(existing)
+                                .build();
+                        return answer;
+                    })
+                    .toList();
+            
+            existing.getAnswers().addAll(newAnswers);
         }
 
         QuestionTestEntity updated = questionTestRepository.save(existing);
@@ -332,7 +343,14 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             MultipartFile audio,
             MultipartFile image
     ) {
-        log.info("Creating question with files: {}", request.getName());
+        log.info("=== QuestionTestServiceImpl.createWithFiles ===");
+        log.info("Question name: {}", request.getName());
+        log.info("Audio file: {} (isEmpty: {})", 
+                audio != null ? audio.getOriginalFilename() : "null",
+                audio != null ? audio.isEmpty() : "null");
+        log.info("Image file: {} (isEmpty: {})", 
+                image != null ? image.getOriginalFilename() : "null",
+                image != null ? image.isEmpty() : "null");
 
         QuestionTestEntity entity = questionTestMapper.toQuestionTestEntity(request);
 
@@ -344,15 +362,15 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         );
         entity.setType(questionType);
 
-        // Set Part (required)
-        if (request.getPartId() != null) {
+        // Set Part (optional)
+        if (request.getPartId() != null && !request.getPartId().isBlank()) {
             PartTestEntity part = partTestRepository.findById(request.getPartId())
                     .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
             entity.setPartEntity(part);
         }
 
         // Set QuestionGroup (optional)
-        if (request.getQuestionGroupId() != null) {
+        if (request.getQuestionGroupId() != null && !request.getQuestionGroupId().isBlank()) {
             QuestionGroupEntity group = questionGroupRepository.findById(request.getQuestionGroupId())
                     .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
             entity.setQuestionGroupEntity(group);

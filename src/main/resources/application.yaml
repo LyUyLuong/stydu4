@@ -1,9 +1,11 @@
 server:
   port: 8080
+  servlet:
+    context-path: /api/v1
 
 app:
   frontend:
-    url: http://localhost:5500  # URL của frontend
+    url: http://localhost:5173  # URL của frontend Vite/React
     base-url: http://localhost:8080
 
 application:
@@ -15,9 +17,10 @@ spring:
   application:
     name: Stydu4
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:stydu5}?createDatabaseIfNotExist=true
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:luong123}
+    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
+
+    username: root
+    password: luong123
   jpa:
     database: mysql
     hibernate:
@@ -38,11 +41,18 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
+            client-id: 617072968798-jdhme3ske636f4qtdjs6ac6c23329b3p.apps.googleusercontent.com
+            client-secret: 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
             scope:
               - email
               - profile
+            redirect-uri: "http://localhost:8080/api/v1/login/oauth2/code/google"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
   servlet:
     multipart:
       enabled: true
@@ -51,13 +61,13 @@ spring:
       file-size-threshold: 2MB
 
 jwt:
-  signerKey: ${JWT_SIGNER_KEY}
-  valid-duration: ${JWT_VALID_DURATION:36000} # in seconds
-  refreshable-duration: ${JWT_REFRESHABLE_DURATION:36000} # in seconds
+  signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
+  valid-duration: 36000 # in seconds
+  refreshable-duration: 36000 # in seconds
 
 # Stripe Configuration
 stripe:
-  api-key: ${STRIPE_API_KEY}
+  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06  # Get from https://dashboard.stripe.com/test/apikeys
   success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
   cancel-url: ${app.frontend.url}/payment/cancel
 
@@ -72,7 +82,7 @@ logging:
   level:
     # Root level
     root: INFO
-    
+
     # Application packages
     com.lul.Stydu4: DEBUG
     com.lul.Stydu4.controller: DEBUG
@@ -80,21 +90,21 @@ logging:
     com.lul.Stydu4.repository: DEBUG
     com.lul.Stydu4.security: INFO
     com.lul.Stydu4.exception: DEBUG
-    
+
     # Spring Framework
     org.springframework.web: INFO
     org.springframework.security: INFO
     org.springframework.boot: INFO
     org.springframework.data: INFO
-    
+
     # Hibernate/JPA
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type: INFO
-    
+
     # Redis
     org.springframework.data.redis: INFO
-    
+
     # OAuth2
     org.springframework.security.oauth2: DEBUG
 

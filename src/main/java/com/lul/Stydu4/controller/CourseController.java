@@ -15,6 +15,7 @@ import com.lul.Stydu4.service.IPaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -50,6 +51,15 @@ public class CourseController {
                 .build());
     }
 
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CourseResponse>>> getAllCoursesForAdmin() {
+        List<CourseResponse> courses = courseService.getAllCourses();
+        return ResponseEntity.ok(ApiResponse.<List<CourseResponse>>builder()
+                .result(courses)
+                .build());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CourseResponse>> getCourse(@PathVariable String id) {
         CourseResponse course = courseService.getCourseById(id);
@@ -71,7 +81,9 @@ public class CourseController {
                     .build());
         } catch (Exception e) {
             log.error("Error purchasing course: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(ApiResponse.<PaymentResponse>builder()
+                    .message(e.getMessage())
+                    .build());
         }
     }
 
@@ -125,6 +137,7 @@ public class CourseController {
     }
 
     @PutMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> publishCourse(@PathVariable String id) {
         courseService.publishCourse(id);
         return ResponseEntity.ok(ApiResponse.<String>builder()
@@ -133,6 +146,7 @@ public class CourseController {
     }
 
     @PutMapping("/{id}/unpublish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> unpublishCourse(@PathVariable String id) {
         courseService.unpublishCourse(id);
         return ResponseEntity.ok(ApiResponse.<String>builder()

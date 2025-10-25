@@ -64,7 +64,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
             // Redirect về frontend với token
             String redirectUrl = UriComponentsBuilder
-                    .fromUriString(frontendUrl + "/Stydu4/oauth2-callback.html")
+                    .fromUriString(frontendUrl + "/login")
                     .queryParam("token", jwtToken)
                     .build()
                     .toUriString();
@@ -75,9 +75,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         } catch (Exception e) {
             log.error("Error during OAuth2 authentication", e);
 
-            // ✅ Fix: Redirect về frontend với error (không duplicate query param)
+            // Redirect về frontend với error
             String errorUrl = UriComponentsBuilder
-                    .fromUriString(frontendUrl + "/Stydu4/oauth2-callback.html")
+                    .fromUriString(frontendUrl + "/login")
                     .queryParam("error", "authentication_failed")
                     .queryParam("message", e.getMessage())
                     .build()

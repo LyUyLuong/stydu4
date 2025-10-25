@@ -14,6 +14,8 @@ public interface ICourseService {
     
     List<CourseResponse> getAllPublishedCourses();
     
+    List<CourseResponse> getAllCourses();
+    
     CourseEntity getCourseEntityById(String id);
     
     void publishCourse(String id);

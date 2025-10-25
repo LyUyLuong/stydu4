@@ -5,6 +5,7 @@ import com.lul.Stydu4.entity.CourseEntity;
 import com.lul.Stydu4.entity.OrderEntity;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.PaymentStatus;
+import com.lul.Stydu4.repository.IEnrollmentRepository;
 import com.lul.Stydu4.repository.IOrderRepository;
 import com.lul.Stydu4.service.IPaymentService;
 import com.stripe.exception.StripeException;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentServiceImpl implements IPaymentService {
 
     private final IOrderRepository orderRepository;
+    private final IEnrollmentRepository enrollmentRepository;
 
     @Value("${stripe.success-url}")
     private String successUrl;
@@ -33,6 +35,12 @@ public class PaymentServiceImpl implements IPaymentService {
     @Transactional
     public PaymentResponse createPayment(UserEntity user, CourseEntity course) throws Exception {
         try {
+            // Kiểm tra xem user đã mua khóa học này chưa
+            if (enrollmentRepository.existsByUserIdAndCourseId(user.getId(), course.getId())) {
+                log.warn("User {} already enrolled in course {}", user.getId(), course.getId());
+                throw new Exception("Bạn đã mua khóa học này rồi!");
+            }
+            
             // Tạo order trong DB
             OrderEntity order = OrderEntity.builder()
                     .user(user)

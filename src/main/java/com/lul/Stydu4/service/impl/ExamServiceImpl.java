@@ -573,6 +573,17 @@ public class ExamServiceImpl implements IExamService {
                             .findFirst()
                             .orElse(null);
 
+                    // Map all answers for this question
+                    List<QuestionResultDetail.AnswerDetail> allAnswers = question.getAnswers().stream()
+                            .map(answer -> QuestionResultDetail.AnswerDetail.builder()
+                                    .answerId(answer.getId())
+                                    .mark(answer.getMark())
+                                    .content(answer.getContent())
+                                    .isCorrect(Boolean.TRUE.equals(answer.getIsCorrect()))
+                                    .build())
+                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark))
+                            .collect(Collectors.toList());
+
                     return QuestionResultDetail.builder()
                             .questionId(question.getId())
                             .questionContent(question.getContent())
@@ -589,6 +600,7 @@ public class ExamServiceImpl implements IExamService {
                             .isCorrect(ua.getIsCorrect())
                             .partName(question.getPartEntity() != null ?
                                     question.getPartEntity().getName() : "")
+                            .allAnswers(allAnswers)
                             .build();
                 })
                 .collect(Collectors.toList());

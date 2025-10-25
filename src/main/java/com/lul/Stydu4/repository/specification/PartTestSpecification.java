@@ -20,6 +20,7 @@ public class PartTestSpecification {
     public static Specification<PartTestEntity> buildSpecification(PartTestSearchRequest request) {
         return Specification.allOf(
                 nameLike(request.getName()),
+                testIdEquals(request.getTestId()),
                 testNameLike((request.getTestName())),
                 typeEquals(request.getType()),
                 createdBetween(request.getCreatedFrom(),request.getCreatedTo())
@@ -32,6 +33,15 @@ public class PartTestSpecification {
                 return null;
             }
             return cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase().trim() + "%");
+        };
+    }
+
+    private static Specification<PartTestEntity> testIdEquals(String testId) {
+        return (root, query, cb) -> {
+            if (testId == null || testId.isBlank()) {
+                return null;
+            }
+            return cb.equal(root.get("testEntity").get("id"), testId.trim());
         };
     }
 

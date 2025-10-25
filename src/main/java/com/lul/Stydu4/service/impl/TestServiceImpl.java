@@ -22,6 +22,7 @@ import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.ITestRepository;
 import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.ITestService;
+import com.lul.Stydu4.util.SlugHelper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -64,6 +65,14 @@ public class TestServiceImpl implements ITestService {
         );
         entity.setType(testType);
 
+        // Auto-generate slug if not provided or empty
+        if (entity.getSlug() == null || entity.getSlug().trim().isEmpty()) {
+            entity.setSlug(SlugHelper.toUniqueSlug(entity.getName()));
+        } else {
+            // Normalize provided slug
+            entity.setSlug(SlugHelper.toSlug(entity.getSlug()));
+        }
+
         return testMapper.toTestResponse(testRepository.save(entity));
     }
 
@@ -80,6 +89,14 @@ public class TestServiceImpl implements ITestService {
                 ErrorCode.INVALID_TEST_TYPE
         );
         entity.setType(testType);
+
+        // Auto-generate slug if not provided or empty
+        if (entity.getSlug() == null || entity.getSlug().trim().isEmpty()) {
+            entity.setSlug(SlugHelper.toUniqueSlug(entity.getName()));
+        } else {
+            // Normalize provided slug
+            entity.setSlug(SlugHelper.toSlug(entity.getSlug()));
+        }
 
         // Upload audio file if provided
         if (audio != null && !audio.isEmpty()) {
@@ -110,6 +127,19 @@ public class TestServiceImpl implements ITestService {
 
         // Cập nhật các trường đơn lẻ; null sẽ bị bỏ qua theo cấu hình mapper
         testMapper.updateTestEntityFromRequest(request, existing);
+
+        // Auto-update slug if name changed and slug is empty
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
+                // Only regenerate if name is different
+                if (!request.getName().equals(existing.getName())) {
+                    existing.setSlug(SlugHelper.toUniqueSlug(request.getName()));
+                }
+            } else {
+                // Normalize provided slug
+                existing.setSlug(SlugHelper.toSlug(request.getSlug()));
+            }
+        }
 
         // Ngữ nghĩa:
         // - partTestIds == null  -> KHÔNG thay đổi quan hệ parts

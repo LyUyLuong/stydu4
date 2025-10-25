@@ -21,6 +21,7 @@ public class PartTestSearchRequest {
     private String description;
 
     private String type;
+    private String testId;
     private String testName;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) // Format: yyyy-MM-dd
