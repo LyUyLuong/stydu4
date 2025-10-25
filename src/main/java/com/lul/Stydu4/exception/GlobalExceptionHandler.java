@@ -37,6 +37,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = AppException.class)
     ResponseEntity<ApiResponse> handlingAppException(AppException exception){
         ErrorCode errorCode = exception.getErrorCode();
+        log.error("AppException caught: code={}, message={}", errorCode.getCode(), errorCode.getMessage());
+        
         ApiResponse apiResponse = new ApiResponse();
 
         apiResponse.setCode(errorCode.getCode());
@@ -131,6 +133,17 @@ public class GlobalExceptionHandler {
         ApiResponse apiResponse = new ApiResponse();
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(detailedMessage);
+
+        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = Exception.class)
+    ResponseEntity<ApiResponse> handlingRuntimeException(Exception exception){
+        log.error("Uncaught exception: ", exception);
+        
+        ApiResponse apiResponse = new ApiResponse();
+        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
+        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage() + ": " + exception.getMessage());
 
         return ResponseEntity.badRequest().body(apiResponse);
     }

@@ -3,6 +3,7 @@ package com.lul.Stydu4.controller;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.Order.OrderResponse;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.IOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.List;
 public class OrderController {
 
     private final IOrderService orderService;
+    private final IUserRepository userRepository;
 
     @GetMapping("/my-orders")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders() {
@@ -35,6 +37,8 @@ public class OrderController {
 
     private UserEntity getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return (UserEntity) authentication.getPrincipal();
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

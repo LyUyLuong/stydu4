@@ -7,6 +7,7 @@ import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.service.IAuthenticationService;
 import com.nimbusds.jose.JOSEException;
 import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.el.parser.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Objects;
 
+@Slf4j
 @Component
 public class CustomJwtDecoder implements JwtDecoder {
 
@@ -40,13 +42,17 @@ public class CustomJwtDecoder implements JwtDecoder {
     public Jwt decode(String token) throws JwtException {
 
         try{
+            log.debug("Attempting to introspect token");
             IntrospectResponse response = authenticationService.introspect(IntrospectRequest.builder().token(token).build());
 
             if(!response.isValid()){
+                log.warn("Token introspection failed: token is not valid");
                 throw new AppException(ErrorCode.UNAUTHENTICATED);
             }
+            log.debug("Token introspection successful");
 
         }catch (JOSEException | java.text.ParseException e){
+            log.error("Token introspection error: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 

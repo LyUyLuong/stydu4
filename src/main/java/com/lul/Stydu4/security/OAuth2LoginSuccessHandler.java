@@ -59,13 +59,14 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 }
             });
 
-            // Generate JWT token
-            String jwtToken = authenticationService.generateTokenForOAuth2User(user);
+            // Generate JWT tokens (access token + refresh token)
+            var authResponse = authenticationService.generateTokenForOAuth2User(user);
 
-            // Redirect về frontend với token
+            // Redirect về frontend với cả 2 tokens
             String redirectUrl = UriComponentsBuilder
                     .fromUriString(frontendUrl + "/login")
-                    .queryParam("token", jwtToken)
+                    .queryParam("token", authResponse.getToken())
+                    .queryParam("refreshToken", authResponse.getRefreshToken())
                     .build()
                     .toUriString();
 
