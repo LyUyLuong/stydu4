@@ -196,6 +196,7 @@ class TestServiceImplTest {
         when(testMapper.toTestEntity(creationRequest)).thenReturn(testEntity);
         when(testRepository.save(testEntity)).thenReturn(savedTestEntity);
         when(testMapper.toTestResponse(savedTestEntity)).thenReturn(detailResponse);
+        when(fileRepository.findById("audio-123")).thenReturn(Optional.of(audioFile));
 
         TestDetailResponse result = testService.create(creationRequest);
 

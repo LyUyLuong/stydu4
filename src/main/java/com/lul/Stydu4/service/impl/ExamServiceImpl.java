@@ -581,7 +581,8 @@ public class ExamServiceImpl implements IExamService {
                                     .content(answer.getContent())
                                     .isCorrect(Boolean.TRUE.equals(answer.getIsCorrect()))
                                     .build())
-                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark))
+                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
                             .collect(Collectors.toList());
 
                     return QuestionResultDetail.builder()

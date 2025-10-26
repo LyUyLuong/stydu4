@@ -9,6 +9,8 @@ import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupDetailResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupSummaryResponse;
+import com.lul.Stydu4.enums.PartType;
+import com.lul.Stydu4.enums.QuestionType;
 import com.lul.Stydu4.service.IQuestionGroupService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -20,6 +22,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/question-groups")
@@ -147,5 +153,26 @@ public class QuestionGroupController {
         return ApiResponse.<QuestionGroupDetailResponse>builder()
                 .result(response)
                 .build();
+    }
+
+    @GetMapping("/types")
+    ApiResponse<List<QuestionGroupTypeDto>> getQuestionGroupTypes() {
+        List<QuestionGroupTypeDto> types = Arrays.stream(QuestionType.values())
+                .map(type -> new QuestionGroupTypeDto(type.getType(), type.getName()))
+                .collect(Collectors.toList());
+
+        return ApiResponse.<List<QuestionGroupTypeDto>>builder()
+                .result(types)
+                .build();
+    }
+
+    public static class QuestionGroupTypeDto {
+        public String value;
+        public String label;
+
+        public QuestionGroupTypeDto(String value, String label) {
+            this.value = value;
+            this.label = label;
+        }
     }
 }

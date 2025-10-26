@@ -9,6 +9,8 @@ import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
 import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
+import com.lul.Stydu4.enums.PartType;
+import com.lul.Stydu4.enums.TestType;
 import com.lul.Stydu4.service.IPartTestService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -18,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/part-tests")
@@ -78,4 +82,24 @@ public class PartTestController {
     }
 
 
+    @GetMapping("/types")
+    ApiResponse<List<PartTestTypeDto>> getPartTestTypes() {
+        List<PartTestTypeDto> types = Arrays.stream(PartType.values())
+                .map(type -> new PartTestTypeDto(type.getPartType(), type.getPartName()))
+                .collect(Collectors.toList());
+
+        return ApiResponse.<List<PartTestTypeDto>>builder()
+                .result(types)
+                .build();
+    }
+
+    public static class PartTestTypeDto {
+        public String value;
+        public String label;
+
+        public PartTestTypeDto(String value, String label) {
+            this.value = value;
+            this.label = label;
+        }
+    }
 }

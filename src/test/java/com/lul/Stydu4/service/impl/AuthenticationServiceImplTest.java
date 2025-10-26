@@ -286,7 +286,7 @@ class AuthenticationServiceImplTest {
             // Parse and verify OAuth2 specific claims
             SignedJWT signedJWT = SignedJWT.parse(response.getToken());
             assertThat(signedJWT.getJWTClaimsSet().getSubject()).isEqualTo("jane_doe@gmail.com");
-            assertThat(signedJWT.getJWTClaimsSet().getIssuer()).isEqualTo("stydu4.com");
+            assertThat(signedJWT.getJWTClaimsSet().getIssuer()).isEqualTo("Stydu4");
             assertThat(signedJWT.getJWTClaimsSet().getStringClaim("userId")).isEqualTo("user-456");
             assertThat(signedJWT.getJWTClaimsSet().getStringClaim("authProvider")).isEqualTo("GOOGLE");
             assertThat(signedJWT.getJWTClaimsSet().getClaim("scope")).isNotNull();

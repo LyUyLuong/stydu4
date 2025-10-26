@@ -8,6 +8,8 @@ import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.Test.TestDetailResponse;
 import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
+import com.lul.Stydu4.enums.QuestionType;
+import com.lul.Stydu4.enums.TestType;
 import com.lul.Stydu4.service.ITestService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -20,7 +22,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/tests")
@@ -139,5 +143,26 @@ public class TestController {
         return ApiResponse.<String>builder()
                 .result("Test deleted")
                 .build();
+    }
+
+    @GetMapping("/types")
+    ApiResponse<List<TestTypeDto>> getTestTypes() {
+        List<TestTypeDto> types = Arrays.stream(TestType.values())
+                .map(type -> new TestTypeDto(type.getType(), type.getName()))
+                .collect(Collectors.toList());
+
+        return ApiResponse.<List<TestTypeDto>>builder()
+                .result(types)
+                .build();
+    }
+
+    public static class TestTypeDto {
+        public String value;
+        public String label;
+
+        public TestTypeDto(String value, String label) {
+            this.value = value;
+            this.label = label;
+        }
     }
 }

@@ -1,36 +1,9 @@
-server:
-  port: 8080
-  servlet:
-    context-path: /api/v1
-
-app:
-  frontend:
-    url: http://localhost:5173  # URL của frontend Vite/React
-    base-url: http://localhost:8080
-
-application:
-  swagger:
-    dev-url: http://localhost:8080
-    prod-url: https://api.stydu4.com
-
+# Đặt profile mặc định là 'dev'
 spring:
+  profiles:
+    active: dev
   application:
     name: Stydu4
-  datasource:
-    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
-
-    username: root
-    password: luong123
-  jpa:
-    database: mysql
-    hibernate:
-      #ddl-auto: none
-      #ddl-auto: create
-      ddl-auto: update
-      #ddl-auto: create-drop
-    properties:
-      format_sql: true
-    show-sql: true
   data:
     redis:
       host: localhost
@@ -46,7 +19,8 @@ spring:
             scope:
               - email
               - profile
-            redirect-uri: "http://localhost:8080/api/v1/login/oauth2/code/google"
+            # TỰ ĐỘNG LẤY PORT TỪ PROFILE
+            redirect-uri: "http://localhost:${server.port}/api/v1/login/oauth2/code/google"
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
@@ -60,6 +34,23 @@ spring:
       max-request-size: 200MB
       file-size-threshold: 2MB
 
+# Giữ nguyên server.servlet.context-path ở file chung
+server:
+  servlet:
+    context-path: /api/v1
+
+app:
+  frontend:
+    url: http://localhost:5173  # URL của frontend Vite/React
+    # TỰ ĐỘNG LẤY PORT TỪ PROFILE
+    base-url: http://localhost:${server.port}
+
+application:
+  swagger:
+    # TỰ ĐỘNG LẤY PORT TỪ PROFILE
+    dev-url: http://localhost:${server.port}
+    prod-url: https://api.stydu4.com
+
 jwt:
   signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
   valid-duration: 36000 # in seconds
@@ -67,7 +58,7 @@ jwt:
 
 # Stripe Configuration
 stripe:
-  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06  # Get from https://dashboard.stripe.com/test/apikeys
+  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06
   success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
   cancel-url: ${app.frontend.url}/payment/cancel
 
@@ -80,32 +71,21 @@ logging:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} [%t] %-40.40logger{39} : %m%n"
   level:
-    # Root level
     root: INFO
-
-    # Application packages
     com.lul.Stydu4: DEBUG
     com.lul.Stydu4.controller: DEBUG
     com.lul.Stydu4.service: DEBUG
     com.lul.Stydu4.repository: DEBUG
     com.lul.Stydu4.security: INFO
     com.lul.Stydu4.exception: DEBUG
-
-    # Spring Framework
     org.springframework.web: INFO
     org.springframework.security: INFO
     org.springframework.boot: INFO
     org.springframework.data: INFO
-
-    # Hibernate/JPA
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type: INFO
-
-    # Redis
     org.springframework.data.redis: INFO
-
-    # OAuth2
     org.springframework.security.oauth2: DEBUG
 
 file:

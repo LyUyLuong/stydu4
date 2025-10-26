@@ -108,25 +108,33 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     public String generateToken(UserEntity user) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
-        JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
+        // Sử dụng Builder để dễ dàng thêm claim
+        JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder()
                 .subject(user.getUsername())
-                .issuer("Stydu4")
+                .issuer("Stydu4") // Giữ nguyên issuer này
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
                 .claim("scope", buildScope(user))
-                .jwtID(UUID.randomUUID().toString())
-                .build();
+                .claim("userId", user.getId()) // Luôn thêm userId
+                .jwtID(UUID.randomUUID().toString());
 
+
+        // Chỉ thêm authProvider nếu nó không phải là LOCAL (hoặc không null)
+        if (user.getAuthProvider() != null && user.getAuthProvider() != AuthProvider.LOCAL) {
+            claimsBuilder.claim("authProvider", user.getAuthProvider().name());
+        }
+        // ==================================
+
+        JWTClaimsSet jwtClaimsSet = claimsBuilder.build();
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
-
-        JWSObject jwsObject = new JWSObject(header,payload);
+        JWSObject jwsObject = new JWSObject(header, payload);
 
         try {
             jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
             return jwsObject.serialize();
         } catch (JOSEException e) {
-        log.error("Cannot create token", e);
-        throw new RuntimeException(e);
+            log.error("Cannot create token", e);
+            throw new RuntimeException(e);
         }
     }
 

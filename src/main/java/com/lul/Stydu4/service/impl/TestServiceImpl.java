@@ -65,6 +65,15 @@ public class TestServiceImpl implements ITestService {
         );
         entity.setType(testType);
 
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            // Tìm FileEntity từ audioId trong request
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND)); // Ví dụ
+
+            // Gán file audio này cho test entity
+            entity.setAudio(audioFile);
+        }
+
         // Auto-generate slug if not provided or empty
         if (entity.getSlug() == null || entity.getSlug().trim().isEmpty()) {
             entity.setSlug(SlugHelper.toUniqueSlug(entity.getName()));
