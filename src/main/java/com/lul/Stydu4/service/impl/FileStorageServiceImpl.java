@@ -1,6 +1,7 @@
 package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.configuration.FileStorageProperties;
+import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.FileType;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -166,6 +169,22 @@ public class FileStorageServiceImpl implements IFileStorageService {
     public List<FileEntity> getFilesByType(FileType fileType) {
         log.info("Getting all files by type: {}", fileType);
         return fileRepository.findByFileType(fileType);
+    }
+    
+    @Override
+    public PageResponse<FileEntity> getFilesByTypeWithPagination(FileType fileType, Pageable pageable) {
+        log.info("Getting files by type: {} with pagination - page: {}, size: {}", 
+                fileType, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<FileEntity> page = fileRepository.findByFileType(fileType, pageable);
+        
+        return PageResponse.<FileEntity>builder()
+                .currentPage(page.getNumber() + 1)
+                .pageSize(page.getSize())
+                .totalPages(page.getTotalPages())
+                .totalElements(page.getTotalElements())
+                .data(page.getContent())
+                .build();
     }
 
     // =============== PRIVATE HELPER METHODS ===============

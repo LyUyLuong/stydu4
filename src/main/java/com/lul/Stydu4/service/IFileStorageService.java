@@ -1,8 +1,10 @@
 package com.lul.Stydu4.service;
 
+import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.enums.FileType;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -38,4 +40,9 @@ public interface IFileStorageService {
      * Get all files by type
      */
     List<FileEntity> getFilesByType(FileType fileType);
+    
+    /**
+     * Get files by type with pagination
+     */
+    PageResponse<FileEntity> getFilesByTypeWithPagination(FileType fileType, Pageable pageable);
 }

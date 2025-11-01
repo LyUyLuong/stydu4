@@ -212,6 +212,22 @@ public class ExamServiceImpl implements IExamService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExamResultResponse> getAllUserExamResults(String userName) {
+        log.info("Fetching all exam results for user: {}", userName);
+
+        UserEntity user = userRepository.findByUsername(userName)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        List<ResultEntity> results = resultRepository
+                .findByUserUsernameOrderByCreatedDateDesc(userName);
+
+        return results.stream()
+                .map(this::mapToExamResultResponse)
+                .collect(Collectors.toList());
+    }
+
     // =============== PRIVATE HELPER METHODS ===============
 
     // ✅ NEW - Build file URL helper

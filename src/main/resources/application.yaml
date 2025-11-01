@@ -19,7 +19,6 @@ spring:
             scope:
               - email
               - profile
-            # TỰ ĐỘNG LẤY PORT TỪ PROFILE
             redirect-uri: "http://localhost:${server.port}/api/v1/login/oauth2/code/google"
         provider:
           google:
@@ -34,20 +33,17 @@ spring:
       max-request-size: 200MB
       file-size-threshold: 2MB
 
-# Giữ nguyên server.servlet.context-path ở file chung
 server:
   servlet:
     context-path: /api/v1
 
 app:
   frontend:
-    url: http://localhost:5173  # URL của frontend Vite/React
-    # TỰ ĐỘNG LẤY PORT TỪ PROFILE
+    url: http://localhost:5173
     base-url: http://localhost:${server.port}
 
 application:
   swagger:
-    # TỰ ĐỘNG LẤY PORT TỪ PROFILE
     dev-url: http://localhost:${server.port}
     prod-url: https://api.stydu4.com
 
@@ -90,7 +86,7 @@ logging:
 
 file:
   storage:
-    location: D:/toeic-storage  # Change to your path
+    location: D:/toeic-storage
   upload:
     images:
       allowed-extensions: jpg,jpeg,png,gif,webp,svg

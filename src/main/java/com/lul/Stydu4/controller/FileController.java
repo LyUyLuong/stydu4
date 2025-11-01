@@ -1,6 +1,7 @@
 package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.response.ApiResponse;
+import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.service.IFileStorageService;
@@ -8,6 +9,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -140,6 +144,34 @@ public class FileController {
                 .code(1000)
                 .message("Files retrieved successfully")
                 .result(files)
+                .build());
+    }
+
+    /**
+     * Get files by type with pagination
+     */
+    @GetMapping("/type/{fileType}/search")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<FileEntity>>> getFilesByTypeWithPagination(
+            @PathVariable FileType fileType,
+            @RequestParam(required = false, value = "page", defaultValue = "1") int page,
+            @RequestParam(required = false, value = "size", defaultValue = "12") int size,
+            @RequestParam(required = false, value = "sortBy", defaultValue = "createdDate") String sortBy,
+            @RequestParam(required = false, value = "sortDirection", defaultValue = "DESC") String sortDirection
+    ) {
+        log.info("Getting files by type: {} with pagination - page: {}, size: {}", fileType, page, size);
+
+        Sort.Direction direction = sortDirection.equalsIgnoreCase("ASC") 
+                ? Sort.Direction.ASC 
+                : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(direction, sortBy));
+
+        PageResponse<FileEntity> response = fileStorageService.getFilesByTypeWithPagination(fileType, pageable);
+
+        return ResponseEntity.ok(ApiResponse.<PageResponse<FileEntity>>builder()
+                .code(1000)
+                .message("Files retrieved successfully")
+                .result(response)
                 .build());
     }
 

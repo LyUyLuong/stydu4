@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.Map;
 import java.util.Objects;
@@ -135,6 +136,17 @@ public class GlobalExceptionHandler {
         apiResponse.setMessage(detailedMessage);
 
         return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = AsyncRequestNotUsableException.class)
+    ResponseEntity<ApiResponse> handlingAsyncRequestNotUsable(AsyncRequestNotUsableException exception){
+        // This exception occurs when client closes connection before response is sent
+        // It's a normal behavior when user navigates away quickly
+        // Log at DEBUG level to avoid cluttering error logs
+        log.debug("Client closed connection before response was sent: {}", exception.getMessage());
+        
+        // Return null to indicate no response should be sent
+        return null;
     }
 
     @ExceptionHandler(value = Exception.class)

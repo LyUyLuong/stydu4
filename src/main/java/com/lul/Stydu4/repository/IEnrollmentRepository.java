@@ -2,6 +2,8 @@ package com.lul.Stydu4.repository;
 
 import com.lul.Stydu4.entity.EnrollmentEntity;
 import com.lul.Stydu4.enums.EnrollmentStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,4 +20,7 @@ public interface IEnrollmentRepository extends JpaRepository<EnrollmentEntity, S
     Optional<EnrollmentEntity> findByUserIdAndCourseId(String userId, String courseId);
     
     boolean existsByUserIdAndCourseId(String userId, String courseId);
+    
+    @EntityGraph(attributePaths = {"course", "user"})
+    List<EnrollmentEntity> findTop10ByOrderByEnrolledAtDesc(Pageable pageable);
 }

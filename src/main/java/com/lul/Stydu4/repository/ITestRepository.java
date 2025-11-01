@@ -11,4 +11,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ITestRepository extends JpaRepository<TestEntity, String>, JpaSpecificationExecutor<TestEntity> {
     Page<TestEntity> findAllBy(Pageable pageable);
+    
+    Long countByStatus(Integer status);
 }
