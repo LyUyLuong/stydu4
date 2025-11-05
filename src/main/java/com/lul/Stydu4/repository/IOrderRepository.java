@@ -42,4 +42,11 @@ public interface IOrderRepository extends JpaRepository<OrderEntity, String> {
     List<Object[]> findTopCoursesByRevenue(@Param("status") PaymentStatus status,
                                           @Param("startDate") LocalDateTime startDate,
                                           @Param("endDate") LocalDateTime endDate);
+    
+    // For order expiration service
+    @Query("SELECT o FROM OrderEntity o WHERE o.status = :status AND o.createdDate < :beforeTime")
+    List<OrderEntity> findByStatusAndCreatedDateBefore(@Param("status") PaymentStatus status,
+                                                        @Param("beforeTime") LocalDateTime beforeTime);
+    
+    List<OrderEntity> findByStatus(PaymentStatus status);
 }
