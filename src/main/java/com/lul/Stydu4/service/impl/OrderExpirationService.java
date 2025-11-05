@@ -3,6 +3,7 @@ package com.lul.Stydu4.service.impl;
 import com.lul.Stydu4.entity.OrderEntity;
 import com.lul.Stydu4.enums.PaymentStatus;
 import com.lul.Stydu4.repository.IOrderRepository;
+import com.lul.Stydu4.service.IEmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,6 +24,7 @@ import java.util.List;
 public class OrderExpirationService {
 
     private final IOrderRepository orderRepository;
+    private final IEmailService emailService;
     
     // Timeout: 1 giờ
     private static final int ORDER_TIMEOUT_HOURS = 1;
@@ -62,8 +64,16 @@ public class OrderExpirationService {
                     
                     // Chuyển status sang FAILED
                     order.setStatus(PaymentStatus.FAILED);
-                    orderRepository.save(order);
+                    order = orderRepository.save(order);
                     expiredCount++;
+                    
+                    // Send cancellation email
+                    try {
+                        emailService.sendOrderCancellationEmail(order);
+                    } catch (Exception emailEx) {
+                        log.error("Failed to send cancellation email for order {}: {}", 
+                                order.getId(), emailEx.getMessage());
+                    }
                     
                 } catch (Exception e) {
                     log.error("Error expiring order {}: {}", order.getId(), e.getMessage());

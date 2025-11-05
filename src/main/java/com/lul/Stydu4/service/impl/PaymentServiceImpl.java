@@ -11,6 +11,7 @@ import com.lul.Stydu4.enums.PaymentStatus;
 import com.lul.Stydu4.repository.ICartRepository;
 import com.lul.Stydu4.repository.IEnrollmentRepository;
 import com.lul.Stydu4.repository.IOrderRepository;
+import com.lul.Stydu4.service.IEmailService;
 import com.lul.Stydu4.service.IPaymentService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
@@ -31,6 +32,7 @@ public class PaymentServiceImpl implements IPaymentService {
     private final IOrderRepository orderRepository;
     private final IEnrollmentRepository enrollmentRepository;
     private final ICartRepository cartRepository;
+    private final IEmailService emailService;
 
     @Value("${stripe.success-url}")
     private String successUrl;
@@ -207,7 +209,7 @@ public class PaymentServiceImpl implements IPaymentService {
                         .stripeSessionId(session.getId())
                         .stripePaymentIntentId(session.getPaymentIntent())
                         .build();
-                orderRepository.save(order);
+                order = orderRepository.save(order);
                 
                 // Create enrollment
                 EnrollmentEntity enrollment = EnrollmentEntity.builder()
@@ -219,6 +221,17 @@ public class PaymentServiceImpl implements IPaymentService {
                 
                 log.info("Created order and enrollment for course: {} - user: {}", 
                         cartItem.getCourse().getId(), userId);
+                
+                // Send confirmation email
+                try {
+                    emailService.sendPaymentConfirmationEmail(order);
+                    emailService.sendEnrollmentWelcomeEmail(
+                        cartItem.getUser().getEmail(), 
+                        cartItem.getCourse().getTitle()
+                    );
+                } catch (Exception emailEx) {
+                    log.error("Failed to send email for order {}: {}", order.getId(), emailEx.getMessage());
+                }
             }
             
             // Clear cart
@@ -247,7 +260,7 @@ public class PaymentServiceImpl implements IPaymentService {
             // Update order status
             order.setStatus(PaymentStatus.COMPLETED);
             order.setStripePaymentIntentId(session.getPaymentIntent());
-            orderRepository.save(order);
+            order = orderRepository.save(order);
             
             // Create enrollment
             EnrollmentEntity enrollment = EnrollmentEntity.builder()
@@ -258,6 +271,18 @@ public class PaymentServiceImpl implements IPaymentService {
             enrollmentRepository.save(enrollment);
             
             log.info("Completed single purchase for order: {}", order.getId());
+            
+            // Send confirmation email
+            try {
+                emailService.sendPaymentConfirmationEmail(order);
+                emailService.sendEnrollmentWelcomeEmail(
+                    order.getUser().getEmail(), 
+                    order.getCourse().getTitle()
+                );
+            } catch (Exception emailEx) {
+                log.error("Failed to send email for order {}: {}", order.getId(), emailEx.getMessage());
+            }
+            
             return true;
             
         } catch (Exception e) {

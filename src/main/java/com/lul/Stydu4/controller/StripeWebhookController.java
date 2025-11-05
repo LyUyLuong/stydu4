@@ -33,6 +33,24 @@ public class StripeWebhookController {
     private String webhookSecret;
 
     /**
+     * Health check endpoint for webhook
+     * GET /webhook/stripe/health
+     */
+    @GetMapping("/health")
+    public ResponseEntity<String> healthCheck() {
+        boolean webhookConfigured = webhookSecret != null && !webhookSecret.isEmpty();
+        
+        log.info("Webhook health check - Configured: {}", webhookConfigured);
+        
+        if (webhookConfigured) {
+            return ResponseEntity.ok("Webhook is configured and ready");
+        } else {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Webhook secret is not configured");
+        }
+    }
+
+    /**
      * Handle Stripe webhook events
      * 
      * Stripe sẽ gửi các events quan trọng:
@@ -105,7 +123,15 @@ public class StripeWebhookController {
                     .getObject()
                     .orElseThrow(() -> new Exception("Failed to deserialize session"));
             
-            log.info("Checkout session completed: {}", session.getId());
+            log.info("===============================================");
+            log.info("PROCESSING CHECKOUT SESSION COMPLETED");
+            log.info("===============================================");
+            log.info("Session ID: {}", session.getId());
+            log.info("Payment Status: {}", session.getPaymentStatus());
+            log.info("Amount Total: {}", session.getAmountTotal());
+            log.info("Currency: {}", session.getCurrency());
+            log.info("Customer Email: {}", session.getCustomerEmail());
+            log.info("===============================================");
             
             // Process payment (với idempotency protection)
             boolean success = paymentService.verifyAndProcessPayment(session.getId());

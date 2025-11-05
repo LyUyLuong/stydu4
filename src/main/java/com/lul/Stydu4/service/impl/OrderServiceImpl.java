@@ -29,6 +29,20 @@ public class OrderServiceImpl implements IOrderService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderById(String orderId, String userId) {
+        OrderEntity order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+        
+        // Verify order belongs to user
+        if (!order.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Access denied: Order does not belong to user");
+        }
+        
+        return mapToResponse(order);
+    }
+
     private OrderResponse mapToResponse(OrderEntity order) {
         return OrderResponse.builder()
                 .id(order.getId())

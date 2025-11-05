@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface IOrderService {
     List<OrderResponse> getUserOrders(String userId);
+    
+    OrderResponse getOrderById(String orderId, String userId);
 }

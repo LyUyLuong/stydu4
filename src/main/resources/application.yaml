@@ -57,6 +57,40 @@ stripe:
   api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06
   success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
   cancel-url: ${app.frontend.url}/payment/cancel
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET:}
+
+# Email Configuration (Chưa kích hoạt - chỉ log)
+# Để kích hoạt gửi email thật:
+# 1. Thêm dependency: spring-boot-starter-mail vào pom.xml
+# 2. Uncomment và cấu hình các trường dưới đây
+# 3. Update EmailServiceImpl để sử dụng JavaMailSender
+#
+# spring:
+#   mail:
+#     host: smtp.gmail.com
+#     port: 587
+#     username: your-email@gmail.com
+#     password: your-app-password
+#     properties:
+#       mail:
+#         smtp:
+#           auth: true
+#           starttls:
+#             enable: true
+#             required: true
+#           connectiontimeout: 5000
+#           timeout: 5000
+#           writetimeout: 5000
+#
+# Hoặc dùng SendGrid:
+# spring:
+#   sendgrid:
+#     api-key: ${SENDGRID_API_KEY}
+#
+# email:
+#   from: noreply@stydu4.com
+#   enabled: false
 
 # Logging Configuration
 logging:

@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,6 +33,16 @@ public class OrderController {
         
         return ResponseEntity.ok(ApiResponse.<List<OrderResponse>>builder()
                 .result(orders)
+                .build());
+    }
+
+    @GetMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(@PathVariable String orderId) {
+        UserEntity user = getCurrentUser();
+        OrderResponse order = orderService.getOrderById(orderId, user.getId());
+        
+        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
+                .result(order)
                 .build());
     }
 
