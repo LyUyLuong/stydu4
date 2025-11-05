@@ -20,6 +20,8 @@ public class QuestionTestSpecification {
                 nameLike(request.getName()),
                 typeEquals(request.getType()),
                 partNameLike(request.getPartName()),
+                partIdEquals(request.getPartId()),  // ✅ Add Part ID filter
+                questionGroupIdEquals(request.getQuestionGroupId()),  // ✅ Add Question Group ID filter
                 createdBetween(request.getCreatedFrom(), request.getCreatedTo())
         );
     }
@@ -69,6 +71,30 @@ public class QuestionTestSpecification {
                     cb.lower(root.get("partEntity").get("name")),
                     "%" + partName.toLowerCase().trim() + "%"
             );
+        };
+    }
+
+    /**
+     * ✅ Tìm kiếm theo Part ID (exact match)
+     */
+    private static Specification<QuestionTestEntity> partIdEquals(String partId) {
+        return (root, query, cb) -> {
+            if (partId == null || partId.isBlank()) {
+                return null;
+            }
+            return cb.equal(root.get("partEntity").get("id"), partId.trim());
+        };
+    }
+
+    /**
+     * ✅ Tìm kiếm theo Question Group ID (exact match)
+     */
+    private static Specification<QuestionTestEntity> questionGroupIdEquals(String questionGroupId) {
+        return (root, query, cb) -> {
+            if (questionGroupId == null || questionGroupId.isBlank()) {
+                return null;
+            }
+            return cb.equal(root.get("questionGroupEntity").get("id"), questionGroupId.trim());
         };
     }
 

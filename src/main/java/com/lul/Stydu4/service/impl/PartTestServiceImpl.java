@@ -29,6 +29,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
 
@@ -98,6 +101,9 @@ public class PartTestServiceImpl implements IPartTestService {
 
 
         if (request.getQuestionIds() != null) {
+            // ✅ Remove old relationships without deleting entities
+            List<QuestionTestEntity> currentQuestions = new ArrayList<>(existing.getQuestions());
+            currentQuestions.forEach(q -> q.setPartEntity(null));
             existing.getQuestions().clear();
 
             if (!request.getQuestionIds().isEmpty()) {
@@ -114,6 +120,9 @@ public class PartTestServiceImpl implements IPartTestService {
 
 
         if (request.getQuestionGroupsIds() != null ) {
+            // ✅ Remove old relationships without deleting entities
+            List<QuestionGroupEntity> currentGroups = new ArrayList<>(existing.getQuestionGroups());
+            currentGroups.forEach(g -> g.setPartEntity(null));
             existing.getQuestionGroups().clear();
 
             if (!request.getQuestionGroupsIds().isEmpty()) {

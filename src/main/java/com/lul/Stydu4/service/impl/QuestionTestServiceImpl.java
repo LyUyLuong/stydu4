@@ -1,5 +1,6 @@
 package com.lul.Stydu4.service.impl;
 
+import com.lul.Stydu4.dto.request.Answer.AnswerCreateRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestCreateRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestSearchRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestUpdateRequest;
@@ -265,25 +266,39 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             existing.setQuestionGroupEntity(questionGroup);
         }
 
-        // ✅ Update Answers - Delete old answers and create new ones
+        // ✅ Update Answers - Update existing answers in place to preserve foreign key references
         if (request.getAnswers() != null && !request.getAnswers().isEmpty()) {
-            // Clear existing answers (cascade delete should handle this)
-            existing.getAnswers().clear();
+            List<AnswerEntity> existingAnswers = existing.getAnswers();
+            List<AnswerCreateRequest> newAnswersData = request.getAnswers();
             
-            // Create new answers
-            List<AnswerEntity> newAnswers = request.getAnswers().stream()
-                    .map(answerReq -> {
-                        AnswerEntity answer = AnswerEntity.builder()
-                                .content(answerReq.getContent())
-                                .isCorrect(answerReq.getIsCorrect())
-                                .mark(answerReq.getMark())
-                                .question(existing)
-                                .build();
-                        return answer;
-                    })
-                    .toList();
+            // Update existing answers or create new ones
+            for (int i = 0; i < newAnswersData.size(); i++) {
+                AnswerCreateRequest answerReq = newAnswersData.get(i);
+                
+                if (i < existingAnswers.size()) {
+                    // Update existing answer in place (preserves foreign key references)
+                    AnswerEntity existingAnswer = existingAnswers.get(i);
+                    existingAnswer.setContent(answerReq.getContent());
+                    existingAnswer.setIsCorrect(answerReq.getIsCorrect());
+                    existingAnswer.setMark(answerReq.getMark());
+                } else {
+                    // Add new answer if request has more answers than existing
+                    AnswerEntity newAnswer = AnswerEntity.builder()
+                            .content(answerReq.getContent())
+                            .isCorrect(answerReq.getIsCorrect())
+                            .mark(answerReq.getMark())
+                            .question(existing)
+                            .build();
+                    existingAnswers.add(newAnswer);
+                }
+            }
             
-            existing.getAnswers().addAll(newAnswers);
+            // Remove extra answers if existing has more than request
+            // Note: This will still fail if users have selected these answers
+            // In production, you might want to soft-delete or keep old answers
+            while (existingAnswers.size() > newAnswersData.size()) {
+                existingAnswers.remove(existingAnswers.size() - 1);
+            }
         }
 
         QuestionTestEntity updated = questionTestRepository.save(existing);

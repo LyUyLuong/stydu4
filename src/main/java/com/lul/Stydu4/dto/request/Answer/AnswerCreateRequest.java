@@ -1,6 +1,5 @@
 package com.lul.Stydu4.dto.request.Answer;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class AnswerCreateRequest {
 
-    @NotBlank(message = "Answer content is required")
+    // Content can be empty for some question types (e.g., Part 1, Part 2 only have marks)
     private String content;
 
     @NotNull(message = "isCorrect flag is required")

@@ -88,6 +88,15 @@ public class ExamServiceImpl implements IExamService {
             throw new AppException(ErrorCode.PART_TEST_NOT_FOUND);
         }
 
+        // Sort parts by part number extracted from name (e.g., "Part 1", "Part 2")
+        parts = parts.stream()
+                .sorted((p1, p2) -> {
+                    int num1 = extractPartNumber(p1.getName());
+                    int num2 = extractPartNumber(p2.getName());
+                    return Integer.compare(num1, num2);
+                })
+                .collect(Collectors.toList());
+
         List<PartQuestionsDetail> partDetails = parts.stream()
                 .map(this::mapPartToDetail)
                 .collect(Collectors.toList());
@@ -237,12 +246,38 @@ public class ExamServiceImpl implements IExamService {
     }
 
     private PartQuestionsDetail mapPartToDetail(PartTestEntity part) {
+        // Sort questions by question number extracted from name
         List<QuestionTestDetailResponse> questions = part.getQuestions().stream()
+                .sorted((q1, q2) -> {
+                    int num1 = extractQuestionNumber(q1.getName());
+                    int num2 = extractQuestionNumber(q2.getName());
+                    return Integer.compare(num1, num2);
+                })
                 .map(questionTestMapper::toQuestionDetailResponse)
                 .collect(Collectors.toList());
 
+        // Sort question groups by group number and their internal questions
         List<QuestionGroupDetailResponse> questionGroups = part.getQuestionGroups().stream()
-                .map(questionGroupMapper::toQuestionGroupDetailResponse)
+                .sorted((qg1, qg2) -> {
+                    int num1 = extractQuestionNumber(qg1.getName());
+                    int num2 = extractQuestionNumber(qg2.getName());
+                    return Integer.compare(num1, num2);
+                })
+                .map(qg -> {
+                    QuestionGroupDetailResponse response = questionGroupMapper.toQuestionGroupDetailResponse(qg);
+                    // Sort questions within the question group
+                    if (response.getQuestions() != null && !response.getQuestions().isEmpty()) {
+                        List<QuestionTestDetailResponse> sortedGroupQuestions = response.getQuestions().stream()
+                                .sorted((q1, q2) -> {
+                                    int num1 = extractQuestionNumber(q1.getName());
+                                    int num2 = extractQuestionNumber(q2.getName());
+                                    return Integer.compare(num1, num2);
+                                })
+                                .collect(Collectors.toList());
+                        response.setQuestions(sortedGroupQuestions);
+                    }
+                    return response;
+                })
                 .collect(Collectors.toList());
 
         return PartQuestionsDetail.builder()
@@ -253,6 +288,54 @@ public class ExamServiceImpl implements IExamService {
                 .questions(questions)
                 .questionGroups(questionGroups)
                 .build();
+    }
+
+    /**
+     * Extract question number from question name
+     * Example: "Question 6 - Part 1" -> 6
+     * Example: "Question Group 68 - 70 - Part 3" -> 68
+     */
+    private int extractQuestionNumber(String name) {
+        if (name == null) {
+            return Integer.MAX_VALUE; // Put null names at the end
+        }
+        
+        // Pattern matches "Question 123" or "Question Group 123"
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "question\\s+(?:group\\s+)?(\\d+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(name);
+        
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        
+        return Integer.MAX_VALUE; // Put unparseable names at the end
+    }
+
+    /**
+     * Extract part number from part name
+     * Example: "Part 1 for Test 1" -> 1
+     * Example: "Part 3" -> 3
+     */
+    private int extractPartNumber(String name) {
+        if (name == null) {
+            return Integer.MAX_VALUE; // Put null names at the end
+        }
+        
+        // Pattern matches "Part 1" or "Part 7"
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "part\\s+(\\d+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(name);
+        
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        
+        return Integer.MAX_VALUE; // Put unparseable names at the end
     }
 
     private Integer calculateTotalQuestions(List<PartTestEntity> parts) {
