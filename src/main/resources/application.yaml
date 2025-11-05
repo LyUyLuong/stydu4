@@ -32,6 +32,21 @@ spring:
       max-file-size: 100MB
       max-request-size: 200MB
       file-size-threshold: 2MB
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:yeppymine@gmail.com}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   servlet:
@@ -60,37 +75,10 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET:}
 
-# Email Configuration (Chưa kích hoạt - chỉ log)
-# Để kích hoạt gửi email thật:
-# 1. Thêm dependency: spring-boot-starter-mail vào pom.xml
-# 2. Uncomment và cấu hình các trường dưới đây
-# 3. Update EmailServiceImpl để sử dụng JavaMailSender
-#
-# spring:
-#   mail:
-#     host: smtp.gmail.com
-#     port: 587
-#     username: your-email@gmail.com
-#     password: your-app-password
-#     properties:
-#       mail:
-#         smtp:
-#           auth: true
-#           starttls:
-#             enable: true
-#             required: true
-#           connectiontimeout: 5000
-#           timeout: 5000
-#           writetimeout: 5000
-#
-# Hoặc dùng SendGrid:
-# spring:
-#   sendgrid:
-#     api-key: ${SENDGRID_API_KEY}
-#
-# email:
-#   from: noreply@stydu4.com
-#   enabled: false
+# Email Configuration
+email:
+  from: ${EMAIL_FROM:noreply@stydu4.com}
+  enabled: ${EMAIL_ENABLED:true}
 
 # Logging Configuration
 logging:
