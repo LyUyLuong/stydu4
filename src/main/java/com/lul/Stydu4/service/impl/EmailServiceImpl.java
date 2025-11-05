@@ -164,7 +164,7 @@ public class EmailServiceImpl implements IEmailService {
                         
                         <p>You now have full access to the course materials.</p>
                         
-                        <a href="%s/my-courses" class="button">Access Your Courses</a>
+                        <a href="%s/courses/%s" class="button">Access Your Course</a>
                         
                         <p>If you have any questions, please don't hesitate to contact us.</p>
                     </div>
@@ -179,7 +179,8 @@ public class EmailServiceImpl implements IEmailService {
             order.getId(),
             order.getCourse().getTitle(),
             order.getAmount(),
-            frontendUrl
+            frontendUrl,
+            order.getCourse().getId()
         );
     }
     
@@ -273,7 +274,7 @@ public class EmailServiceImpl implements IEmailService {
                             <li>Take practice tests</li>
                         </ul>
                         
-                        <a href="%s/my-courses" class="button">Start Learning</a>
+                        <a href="%s/courses" class="button">Browse Courses</a>
                         
                         <p>We're here to support you every step of the way!</p>
                     </div>
