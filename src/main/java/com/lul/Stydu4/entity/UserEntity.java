@@ -40,6 +40,10 @@ public class UserEntity extends BaseEntity{
     @Column(name = "provider_id")
     private String providerId; // Google user ID
 
+    @Column(name = "is_banned")
+    @Builder.Default
+    private Boolean isBanned = false; // User account status
+
     @ManyToMany
     @JoinTable(
             name = "user_roles",

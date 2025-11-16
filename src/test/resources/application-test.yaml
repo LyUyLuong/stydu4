@@ -22,3 +22,26 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+  # === Mail Configuration for Tests ===
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+
+# === JWT Configuration for Tests ===
+jwt:
+  signerKey: "test-signer-key-for-unit-tests-only-do-not-use-in-production-minimum-32-characters-required"
+  valid-duration: 3600  # 1 hour
+  refreshable-duration: 86400  # 24 hours
+
+# === Stripe Configuration for Tests ===
+stripe:
+  api-key: "sk_test_dummy_key_for_unit_tests_only"
+  webhook-secret: "whsec_test_dummy_webhook_secret_for_unit_tests_only"
+
+# === Email Configuration for Tests ===
+email:
+  from: "test@example.com"
+  enabled: false  # Disable email sending in tests

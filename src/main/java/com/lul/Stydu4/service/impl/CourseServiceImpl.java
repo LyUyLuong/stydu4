@@ -51,7 +51,8 @@ public class CourseServiceImpl implements com.lul.Stydu4.service.ICourseService 
 
     @Override
     public CourseResponse getCourseById(String id) {
-        CourseEntity course = courseRepository.findById(id)
+        // ✅ Use optimized query to prevent N+1 problem when accessing tests
+        CourseEntity course = courseRepository.findByIdWithTests(id)
                 .orElseThrow(() -> new AppException(ErrorCode.COURSE_NOT_FOUND));
         return mapToResponse(course);
     }

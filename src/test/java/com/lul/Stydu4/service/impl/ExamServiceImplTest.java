@@ -615,6 +615,14 @@ class ExamServiceImplTest {
         @DisplayName("Should get exam result successfully")
         void getExamResult_ValidId_Success() {
             // GIVEN
+            ResultHavePartsEntity resultHavePart = ResultHavePartsEntity.builder()
+                    .id("rhp-1")
+                    .partTest(listeningPart)
+                    .totalQuestions(1)
+                    .correctAnswers(1)
+                    .accuracy(100.0)
+                    .build();
+
             ResultEntity resultEntity = ResultEntity.builder()
                     .id("result-1")
                     .test(toeicTest)
@@ -626,8 +634,10 @@ class ExamServiceImplTest {
                     .readingCorrectAnswer(60)
                     .totalQuestions(110)
                     .completeTime(Duration.ofMinutes(120).toMillis())
-                    .resultHaveParts(new ArrayList<>())
+                    .resultHaveParts(List.of(resultHavePart))
                     .build();
+
+            resultHavePart.setResult(resultEntity);
 
             UserAnswerEntity userAnswer = UserAnswerEntity.builder()
                     .result(resultEntity)
@@ -648,6 +658,8 @@ class ExamServiceImplTest {
             assertThat(response.getTotalScore()).isEqualTo(550);
             assertThat(response.getListeningScore()).isEqualTo(250);
             assertThat(response.getReadingScore()).isEqualTo(300);
+            // Should return all questions in completed parts (1 question from listeningPart)
+            assertThat(response.getQuestionResults()).hasSize(1);
 
             verify(resultRepository).findById("result-1");
         }
@@ -698,6 +710,14 @@ class ExamServiceImplTest {
             question1.setAudio(audioFile);
             question1.setImage(imageFile);
 
+            ResultHavePartsEntity resultHavePart = ResultHavePartsEntity.builder()
+                    .id("rhp-1")
+                    .partTest(listeningPart)
+                    .totalQuestions(1)
+                    .correctAnswers(1)
+                    .accuracy(100.0)
+                    .build();
+
             ResultEntity resultEntity = ResultEntity.builder()
                     .id("result-1")
                     .test(toeicTest)
@@ -709,8 +729,10 @@ class ExamServiceImplTest {
                     .readingCorrectAnswer(60)
                     .totalQuestions(110)
                     .completeTime(Duration.ofMinutes(120).toMillis())
-                    .resultHaveParts(new ArrayList<>())
+                    .resultHaveParts(List.of(resultHavePart))
                     .build();
+
+            resultHavePart.setResult(resultEntity);
 
             UserAnswerEntity userAnswer = UserAnswerEntity.builder()
                     .result(resultEntity)

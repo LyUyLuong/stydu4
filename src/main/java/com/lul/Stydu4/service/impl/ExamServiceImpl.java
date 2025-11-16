@@ -172,7 +172,10 @@ public class ExamServiceImpl implements IExamService {
         }
 
         List<UserAnswerEntity> userAnswers = userAnswerRepository.findByResultId(resultId);
-        List<QuestionResultDetail> questionResults = mapToQuestionResults(userAnswers);
+        
+        // Get all questions from completed parts and map with user answers
+        List<QuestionResultDetail> questionResults = mapToAllQuestionResults(result, userAnswers);
+        
         List<PartResultDetail> partResults = mapToPartResults(result.getResultHaveParts());
         List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
 
@@ -458,7 +461,10 @@ public class ExamServiceImpl implements IExamService {
                 );
 
                 questionResults.add(data.getQuestionResult());
-                userAnswerEntities.add(data.getUserAnswer());
+                // Only save user answer if they actually answered the question
+                if (data.getUserAnswer().getAnswer() != null) {
+                    userAnswerEntities.add(data.getUserAnswer());
+                }
                 partResult.incrementTotal();
 
                 if (data.isCorrect()) {
@@ -486,7 +492,10 @@ public class ExamServiceImpl implements IExamService {
                     );
 
                     questionResults.add(data.getQuestionResult());
-                    userAnswerEntities.add(data.getUserAnswer());
+                    // Only save user answer if they actually answered the question
+                    if (data.getUserAnswer().getAnswer() != null) {
+                        userAnswerEntities.add(data.getUserAnswer());
+                    }
                     partResult.incrementTotal();
 
                     if (data.isCorrect()) {
@@ -660,6 +669,85 @@ public class ExamServiceImpl implements IExamService {
                 .partResults(partResultsList)
                 .questionResults(processingResult.getQuestionResults())
                 .build();
+    }
+
+    /**
+     * Map all questions from completed parts with user answers
+     * Shows all questions including unanswered ones
+     */
+    private List<QuestionResultDetail> mapToAllQuestionResults(ResultEntity result, List<UserAnswerEntity> userAnswers) {
+        // Create a map of user answers by question ID for quick lookup
+        Map<String, UserAnswerEntity> userAnswerMap = userAnswers.stream()
+                .collect(Collectors.toMap(
+                        ua -> ua.getQuestion().getId(),
+                        ua -> ua,
+                        (existing, replacement) -> existing // In case of duplicates, keep existing
+                ));
+
+        // Get all parts that were completed
+        List<PartTestEntity> completedParts = result.getResultHaveParts().stream()
+                .map(ResultHavePartsEntity::getPartTest)
+                .collect(Collectors.toList());
+
+        // Get all questions from completed parts
+        List<QuestionTestEntity> allQuestions = new ArrayList<>();
+        for (PartTestEntity part : completedParts) {
+            // Get direct questions in part
+            if (part.getQuestions() != null) {
+                allQuestions.addAll(part.getQuestions());
+            }
+            
+            // Get questions from question groups in part
+            if (part.getQuestionGroups() != null) {
+                for (QuestionGroupEntity group : part.getQuestionGroups()) {
+                    if (group.getQuestions() != null) {
+                        allQuestions.addAll(group.getQuestions());
+                    }
+                }
+            }
+        }
+
+        // Map all questions to QuestionResultDetail
+        return allQuestions.stream()
+                .map(question -> {
+                    UserAnswerEntity userAnswer = userAnswerMap.get(question.getId());
+                    AnswerEntity correctAnswer = question.getAnswers().stream()
+                            .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
+                            .findFirst()
+                            .orElse(null);
+
+                    // Map all answers for this question
+                    List<QuestionResultDetail.AnswerDetail> allAnswers = question.getAnswers().stream()
+                            .map(answer -> QuestionResultDetail.AnswerDetail.builder()
+                                    .answerId(answer.getId())
+                                    .mark(answer.getMark())
+                                    .content(answer.getContent())
+                                    .isCorrect(Boolean.TRUE.equals(answer.getIsCorrect()))
+                                    .build())
+                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                            .collect(Collectors.toList());
+
+                    return QuestionResultDetail.builder()
+                            .questionId(question.getId())
+                            .questionContent(question.getContent())
+                            .audioId(question.getAudio() != null ? question.getAudio().getId() : null)
+                            .audioUrl(question.getAudio() != null ? buildFileUrl(question.getAudio().getId()) : null)
+                            .imageId(question.getImage() != null ? question.getImage().getId() : null)
+                            .imageUrl(question.getImage() != null ? buildFileUrl(question.getImage().getId()) : null)
+                            .userAnswerId(userAnswer != null ? userAnswer.getAnswer().getId() : null)
+                            .userAnswerContent(userAnswer != null ? userAnswer.getAnswer().getContent() : null)
+                            .correctAnswerId(correctAnswer != null ? correctAnswer.getId() : null)
+                            .correctAnswerContent(correctAnswer != null ? correctAnswer.getContent() : null)
+                            .isCorrect(userAnswer != null ? userAnswer.getIsCorrect() : false)
+                            .partName(question.getPartEntity() != null ?
+                                    question.getPartEntity().getName() : 
+                                    (question.getQuestionGroupEntity() != null && question.getQuestionGroupEntity().getPartEntity() != null ?
+                                            question.getQuestionGroupEntity().getPartEntity().getName() : ""))
+                            .allAnswers(allAnswers)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private List<QuestionResultDetail> mapToQuestionResults(List<UserAnswerEntity> userAnswers) {

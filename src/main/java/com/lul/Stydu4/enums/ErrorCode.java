@@ -32,6 +32,7 @@ public enum ErrorCode {
     EMAIL_REQUIRED(1107, "Email is required", HttpStatus.BAD_REQUEST),
     INVALID_EMAIL(1108, "Invalid email format", HttpStatus.BAD_REQUEST),
     INVALID_DOB(1109, "Age must be at least {min}", HttpStatus.BAD_REQUEST),
+    USER_BANNED(1110, "User account has been banned", HttpStatus.FORBIDDEN),
 
     // ============================================
     // ROLE ERRORS (12xx)
@@ -90,11 +91,16 @@ public enum ErrorCode {
     COURSE_NOT_FOUND(9000, "Course not found", HttpStatus.NOT_FOUND),
     COURSE_ALREADY_PURCHASED(9001, "Course already purchased", HttpStatus.CONFLICT),
     COURSE_ALREADY_IN_CART(9002, "Course already in cart", HttpStatus.CONFLICT),
+    COURSE_NOT_AVAILABLE(9003, "Course is not available for purchase", HttpStatus.BAD_REQUEST),
+    COURSE_NOT_PUBLISHED(9004, "Course is not published", HttpStatus.BAD_REQUEST),
+    INVALID_COURSE_PRICE(9005, "Invalid course price", HttpStatus.BAD_REQUEST),
 
     // ============================================
     // ENROLLMENT ERRORS (91xx)
     // ============================================
     ENROLLMENT_NOT_FOUND(9100, "Enrollment not found", HttpStatus.NOT_FOUND),
+    ENROLLMENT_ALREADY_EXISTS(9101, "User already enrolled in this course", HttpStatus.CONFLICT),
+    ENROLLMENT_EXPIRED(9102, "Enrollment has expired", HttpStatus.FORBIDDEN),
 
     // ============================================
     // PAYMENT ERRORS (92xx)
@@ -102,6 +108,8 @@ public enum ErrorCode {
     PAYMENT_FAILED(9200, "Payment failed", HttpStatus.PAYMENT_REQUIRED),
     PAYMENT_VERIFICATION_FAILED(9201, "Payment verification failed", HttpStatus.UNPROCESSABLE_ENTITY),
     PAYMENT_SESSION_NOT_FOUND(9202, "Payment session not found", HttpStatus.NOT_FOUND),
+    PAYMENT_PROCESSING_FAILED(9203, "Payment processing failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    PAYMENT_UNAUTHORIZED(9204, "Unauthorized payment access", HttpStatus.FORBIDDEN),
 
     // ============================================
     // CART ERRORS (93xx)

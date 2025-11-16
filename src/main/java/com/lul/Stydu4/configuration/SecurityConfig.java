@@ -83,7 +83,6 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
-        // Cấu hình OAuth2 Login - CHỈ cho phép OAuth2 trên path /oauth2/**, KHÔNG redirect tự động
         http.oauth2Login(oauth2 -> oauth2
                 .successHandler(oauth2LoginSuccessHandler)
                 .loginPage("/oauth2/authorization/google")

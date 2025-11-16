@@ -1,5 +1,6 @@
 package com.lul.Stydu4.controller;
 
+import com.lul.Stydu4.annotation.RateLimited;
 import com.lul.Stydu4.dto.request.Exam.SubmitExamRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.Exam.ExamQuestionsResponse;
@@ -69,6 +70,7 @@ public class ExamController {
      * }
      */
     @PostMapping("/submit")
+    @RateLimited(maxRequests = 3, timeWindowSeconds = 60, keyPrefix = "exam_submit")
     public ApiResponse<ExamResultResponse> submitExam(
             @RequestBody @Valid SubmitExamRequest request
     ) {

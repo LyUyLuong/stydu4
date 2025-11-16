@@ -173,7 +173,8 @@ public class PartTestServiceImpl implements IPartTestService {
 
     @Override
     public PartTestDetailResponse getPartTestById(String partTestId) {
-        PartTestEntity partTest = partTestRepository.findById(partTestId)
+        // ✅ Use optimized query to prevent N+1 problem
+        PartTestEntity partTest = partTestRepository.findByIdWithQuestions(partTestId)
                 .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
         return partTestMapper.toPartTestResponse(partTest);
     }

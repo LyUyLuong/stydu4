@@ -1,0 +1,40 @@
+# Maven
+target/
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Logs
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Storage
+D:/toeic-storage/
+
+# Kafka
+kafka-stats.ps1
+monitor-all-topics.ps1
+monitor-kafka.ps1
+
+# Documentation
+*.md
+README.md

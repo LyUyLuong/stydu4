@@ -164,7 +164,7 @@ class CourseServiceImplTest {
         @DisplayName("Should return course when ID exists")
         void getCourseById_ValidId_Success() {
             // GIVEN
-            when(courseRepository.findById("course-123")).thenReturn(Optional.of(course));
+            when(courseRepository.findByIdWithTests("course-123")).thenReturn(Optional.of(course));
 
             // WHEN
             CourseResponse result = courseService.getCourseById("course-123");
@@ -174,21 +174,21 @@ class CourseServiceImplTest {
             assertThat(result.getId()).isEqualTo("course-123");
             assertThat(result.getTitle()).isEqualTo("TOEIC Complete Course");
 
-            verify(courseRepository).findById("course-123");
+            verify(courseRepository).findByIdWithTests("course-123");
         }
 
         @Test
         @DisplayName("Should throw exception when course not found")
         void getCourseById_InvalidId_ThrowException() {
             // GIVEN
-            when(courseRepository.findById("invalid-id")).thenReturn(Optional.empty());
+            when(courseRepository.findByIdWithTests("invalid-id")).thenReturn(Optional.empty());
 
             // WHEN & THEN
             assertThatThrownBy(() -> courseService.getCourseById("invalid-id"))
                     .isInstanceOf(AppException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_NOT_FOUND);
 
-            verify(courseRepository).findById("invalid-id");
+            verify(courseRepository).findByIdWithTests("invalid-id");
         }
     }
 

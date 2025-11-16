@@ -13,5 +13,5 @@ public interface IPaymentService {
     
     CourseEntity getCourseFromOrder(String orderId) throws Exception;
     
-    boolean verifyAndProcessPayment(String sessionId) throws StripeException;
+    boolean verifyAndProcessPayment(String sessionId, String userId) throws StripeException;
 }

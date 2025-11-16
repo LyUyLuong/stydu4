@@ -42,3 +42,6 @@ logs/
 *.log
 # Log files
 logs/*.log
+*.md
+logs/error.log
+logs/stydu4.log

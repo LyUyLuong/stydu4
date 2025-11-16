@@ -13,6 +13,12 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Builder
+@Table(name = "test_entity", indexes = {
+    @Index(name = "idx_test_type", columnList = "type"),
+    @Index(name = "idx_test_status", columnList = "status"),
+    @Index(name = "idx_test_slug", columnList = "slug"),
+    @Index(name = "idx_test_type_status", columnList = "type, status")
+})
 public class TestEntity extends BaseEntity{
 
     @Id

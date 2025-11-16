@@ -138,6 +138,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(apiResponse);
     }
 
+    @ExceptionHandler(value = RateLimitExceededException.class)
+    ResponseEntity<ApiResponse> handlingRateLimitExceeded(RateLimitExceededException exception){
+        log.warn("Rate limit exceeded: {}", exception.getMessage());
+        
+        ApiResponse apiResponse = new ApiResponse();
+        apiResponse.setCode(429);
+        apiResponse.setMessage(exception.getMessage());
+
+        return ResponseEntity.status(429).body(apiResponse);
+    }
+
     @ExceptionHandler(value = AsyncRequestNotUsableException.class)
     ResponseEntity<ApiResponse> handlingAsyncRequestNotUsable(AsyncRequestNotUsableException exception){
         // This exception occurs when client closes connection before response is sent

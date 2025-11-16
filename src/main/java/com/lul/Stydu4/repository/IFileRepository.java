@@ -19,4 +19,13 @@ public interface IFileRepository extends JpaRepository<FileEntity, String> {
     List<FileEntity> findByOriginalFilenameContaining(String filename);
 
     boolean existsByFilePath(String filePath);
+    
+    /**
+     * Check if a file exists in database by its stored name (filename in storage)
+     * Used by FileCleanupScheduler to identify orphaned files
+     * 
+     * @param storedFilename The filename stored in the file system
+     * @return true if file record exists in database
+     */
+    boolean existsByStoredFilename(String storedFilename);
 }

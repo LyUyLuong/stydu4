@@ -413,7 +413,7 @@ class TestServiceImplTest {
         partResponse.setId("part-456");
         partResponse.setName("Sample Part");
 
-        when(testRepository.findById("test-123")).thenReturn(Optional.of(testEntity));
+        when(testRepository.findByIdWithParts("test-123")).thenReturn(Optional.of(testEntity));
         when(testMapper.toTestResponse(testEntity)).thenReturn(detailResponse);
         when(partTestMapper.toPartTestResponse(partTestEntity)).thenReturn(partResponse);
 
@@ -423,7 +423,7 @@ class TestServiceImplTest {
         assertEquals(1, result.getParts().size());
         assertEquals("part-456", result.getParts().get(0).getId());
         assertEquals("TOEIC", result.getType());
-        verify(testRepository).findById("test-123");
+        verify(testRepository).findByIdWithParts("test-123");
         verify(testMapper).toTestResponse(testEntity);
         verify(partTestMapper).toPartTestResponse(partTestEntity);
     }

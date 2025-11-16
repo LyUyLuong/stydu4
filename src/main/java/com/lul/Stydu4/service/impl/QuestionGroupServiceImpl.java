@@ -173,7 +173,8 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     public QuestionGroupDetailResponse getQuestionGroupById(String questionGroupId) {
         log.info("Fetching question group with id: {}", questionGroupId);
 
-        QuestionGroupEntity questionGroup = questionGroupRepository.findById(questionGroupId)
+        // ✅ Use optimized query to prevent N+1 problem
+        QuestionGroupEntity questionGroup = questionGroupRepository.findByIdWithDetails(questionGroupId)
                 .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
 
         return questionGroupMapper.toQuestionGroupDetailResponse(questionGroup);

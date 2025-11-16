@@ -134,7 +134,8 @@ public class StripeWebhookController {
             log.info("===============================================");
             
             // Process payment (với idempotency protection)
-            boolean success = paymentService.verifyAndProcessPayment(session.getId());
+            // Note: userId is retrieved from session metadata in the service layer
+            boolean success = paymentService.verifyAndProcessPayment(session.getId(), null);
             
             if (success) {
                 log.info("Successfully processed checkout session: {}", session.getId());

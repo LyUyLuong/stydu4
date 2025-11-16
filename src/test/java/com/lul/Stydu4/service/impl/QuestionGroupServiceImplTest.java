@@ -317,7 +317,7 @@ class QuestionGroupServiceImplTest {
         @DisplayName("Should return question group when ID exists")
         void getQuestionGroupById_ValidId_Success() {
             // GIVEN
-            when(questionGroupRepository.findById("group-123")).thenReturn(Optional.of(questionGroup));
+            when(questionGroupRepository.findByIdWithDetails("group-123")).thenReturn(Optional.of(questionGroup));
             when(questionGroupMapper.toQuestionGroupDetailResponse(questionGroup)).thenReturn(detailResponse);
 
             // WHEN
@@ -326,14 +326,14 @@ class QuestionGroupServiceImplTest {
             // THEN
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo("group-123");
-            verify(questionGroupRepository).findById("group-123");
+            verify(questionGroupRepository).findByIdWithDetails("group-123");
         }
 
         @Test
         @DisplayName("Should throw exception when question group not found")
         void getQuestionGroupById_InvalidId_ThrowException() {
             // GIVEN
-            when(questionGroupRepository.findById("invalid-id")).thenReturn(Optional.empty());
+            when(questionGroupRepository.findByIdWithDetails("invalid-id")).thenReturn(Optional.empty());
 
             // WHEN & THEN
             assertThatThrownBy(() -> questionGroupService.getQuestionGroupById("invalid-id"))

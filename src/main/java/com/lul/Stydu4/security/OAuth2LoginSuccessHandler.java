@@ -35,7 +35,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private String frontendUrl;
 
     @Override
-    @Transactional  // ✅ Thêm @Transactional để tránh LazyInitializationException
+    @Transactional  // Thêm @Transactional để tránh LazyInitializationException
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {

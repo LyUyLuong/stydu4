@@ -12,7 +12,13 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+    @Index(name = "idx_user_id", columnList = "user_id"),
+    @Index(name = "idx_stripe_session_id", columnList = "stripeSessionId"),
+    @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_status_created", columnList = "status, createdDate"),
+    @Index(name = "idx_course_user", columnList = "course_id, user_id")
+})
 public class OrderEntity extends BaseEntity {
 
     @Id

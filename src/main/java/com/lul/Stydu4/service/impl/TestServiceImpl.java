@@ -27,6 +27,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -120,7 +122,9 @@ public class TestServiceImpl implements ITestService {
 
     @Transactional
     @Override
+    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
     public TestDetailResponse update(String testId, TestUpdateRequest request) {
+        log.info("Updating test and invalidating cache: {}", testId);
         TestEntity existing = testRepository.findById(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
@@ -222,8 +226,11 @@ public class TestServiceImpl implements ITestService {
 
 
     @Override
+    @Cacheable(value = "test-details", key = "#testId")
     public TestDetailResponse getTestById(String testId) {
-        TestEntity test = testRepository.findById(testId)
+        log.debug("Cache miss - Loading test details from database: {}", testId);
+        // Use optimized query with EntityGraph to prevent N+1 problem
+        TestEntity test = testRepository.findByIdWithParts(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
         TestDetailResponse testDetailResponse = testMapper.toTestResponse(test);
@@ -234,7 +241,9 @@ public class TestServiceImpl implements ITestService {
     }
 
     @Override
+    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
     public void deleteTest(String testId) {
+        log.info("Deleting test and invalidating cache: {}", testId);
         testRepository.deleteById(testId);
     }
 

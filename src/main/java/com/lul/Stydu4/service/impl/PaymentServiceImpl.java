@@ -7,7 +7,12 @@ import com.lul.Stydu4.entity.EnrollmentEntity;
 import com.lul.Stydu4.entity.OrderEntity;
 import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.EnrollmentStatus;
+import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.PaymentStatus;
+import com.lul.Stydu4.exception.CourseException;
+import com.lul.Stydu4.exception.EnrollmentException;
+import com.lul.Stydu4.exception.AppException;
+import com.lul.Stydu4.exception.PaymentException;
 import com.lul.Stydu4.repository.ICartRepository;
 import com.lul.Stydu4.repository.IEnrollmentRepository;
 import com.lul.Stydu4.repository.IOrderRepository;
@@ -22,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -41,14 +47,36 @@ public class PaymentServiceImpl implements IPaymentService {
     private String cancelUrl;
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public PaymentResponse createPayment(UserEntity user, CourseEntity course) throws Exception {
         try {
-            // Kiểm tra xem user đã mua khóa học này chưa
+            // ===== BUSINESS VALIDATION =====
+            
+            // 1. Validate user is not banned
+            if (user.getIsBanned() != null && user.getIsBanned()) {
+                log.warn("Banned user {} attempted to purchase course {}", user.getId(), course.getId());
+                throw new AppException(ErrorCode.USER_BANNED);
+            }
+            
+            // 2. Validate course is published
+            if (course.getIsPublished() == null || !course.getIsPublished()) {
+                log.warn("User {} attempted to purchase unpublished course {}", user.getId(), course.getId());
+                throw new CourseException(ErrorCode.COURSE_NOT_PUBLISHED);
+            }
+            
+            // 3. Validate course price is valid
+            if (course.getPrice() == null || course.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                log.error("Course {} has invalid price: {}", course.getId(), course.getPrice());
+                throw new CourseException(ErrorCode.INVALID_COURSE_PRICE);
+            }
+            
+            // 4. Check if user already enrolled in this course
             if (enrollmentRepository.existsByUserIdAndCourseId(user.getId(), course.getId())) {
                 log.warn("User {} already enrolled in course {}", user.getId(), course.getId());
-                throw new Exception("Bạn đã mua khóa học này rồi!");
+                throw new EnrollmentException(ErrorCode.ENROLLMENT_ALREADY_EXISTS);
             }
+            
+            // ===== CREATE ORDER AND PAYMENT =====
             
             // Tạo order trong DB
             OrderEntity order = OrderEntity.builder()
@@ -153,17 +181,25 @@ public class PaymentServiceImpl implements IPaymentService {
     }
 
     @Override
-    @Transactional
-    public boolean verifyAndProcessPayment(String sessionId) throws StripeException {
+    @Transactional(rollbackFor = Exception.class)
+    public boolean verifyAndProcessPayment(String sessionId, String userId) throws StripeException {
         try {
             // Retrieve session from Stripe
             Session session = Session.retrieve(sessionId);
             
             // Get metadata
-            String userId = session.getMetadata().get("userId");
+            String metadataUserId = session.getMetadata().get("userId");
             String type = session.getMetadata().get("type");
             
-            log.info("Verifying payment for session: {}, type: {}, user: {}", sessionId, type, userId);
+            log.info("Verifying payment for session: {}, type: {}, requestUserId: {}, metadataUserId: {}", 
+                    sessionId, type, userId, metadataUserId);
+            
+            // Security check: verify the user requesting verification owns this payment session
+            if (metadataUserId != null && !metadataUserId.equals(userId)) {
+                log.error("Security violation: User {} attempted to verify payment for user {}", 
+                        userId, metadataUserId);
+                throw new SecurityException("Unauthorized: You cannot verify payments for other users");
+            }
             
             // Check if payment is successful
             if (!"paid".equals(session.getPaymentStatus())) {
@@ -176,9 +212,12 @@ public class PaymentServiceImpl implements IPaymentService {
                 return processCartCheckout(userId, session);
             } else {
                 // Process single course purchase
-                return processSinglePurchase(sessionId, session);
+                return processSinglePurchase(sessionId, session, userId);
             }
             
+        } catch (SecurityException e) {
+            log.error("Security error during verification: {}", e.getMessage());
+            throw new StripeException(e.getMessage(), null, null, 403, null) {};
         } catch (StripeException e) {
             log.error("Stripe error during verification: {}", e.getMessage());
             throw e;
@@ -246,7 +285,7 @@ public class PaymentServiceImpl implements IPaymentService {
         }
     }
     
-    private boolean processSinglePurchase(String sessionId, Session session) {
+    private boolean processSinglePurchase(String sessionId, Session session, String userId) {
         try {
             // Find order by session ID
             OrderEntity order = orderRepository.findByStripeSessionId(sessionId)
@@ -254,6 +293,13 @@ public class PaymentServiceImpl implements IPaymentService {
             
             if (order == null) {
                 log.warn("No order found for session: {}", sessionId);
+                return false;
+            }
+            
+            // Security check: verify the user owns this order
+            if (!order.getUser().getId().equals(userId)) {
+                log.error("Security violation: User {} attempted to process order for user {}", 
+                        userId, order.getUser().getId());
                 return false;
             }
             
@@ -270,7 +316,7 @@ public class PaymentServiceImpl implements IPaymentService {
                     .build();
             enrollmentRepository.save(enrollment);
             
-            log.info("Completed single purchase for order: {}", order.getId());
+            log.info("Completed single purchase for order: {}, user: {}", order.getId(), userId);
             
             // Send confirmation email
             try {

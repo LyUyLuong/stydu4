@@ -8,7 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Email Service Implementation
@@ -124,6 +127,59 @@ public class EmailServiceImpl implements IEmailService {
             
         } catch (Exception e) {
             log.error("Failed to send welcome email: {}", e.getMessage(), e);
+        }
+    }
+    
+    // ============================================
+    // ASYNC EMAIL METHODS (Non-blocking)
+    // ============================================
+    
+    /**
+     * Send payment confirmation email asynchronously
+     * Uses dedicated email thread pool to avoid blocking main transaction
+     */
+    @Override
+    @Async("emailTaskExecutor")
+    public CompletableFuture<Void> sendPaymentConfirmationEmailAsync(OrderEntity order) {
+        log.debug("Async: Sending payment confirmation email for order: {}", order.getId());
+        try {
+            sendPaymentConfirmationEmail(order);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            log.error("Async: Failed to send payment confirmation email", e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+    
+    /**
+     * Send order cancellation email asynchronously
+     */
+    @Override
+    @Async("emailTaskExecutor")
+    public CompletableFuture<Void> sendOrderCancellationEmailAsync(OrderEntity order) {
+        log.debug("Async: Sending order cancellation email for order: {}", order.getId());
+        try {
+            sendOrderCancellationEmail(order);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            log.error("Async: Failed to send cancellation email", e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+    
+    /**
+     * Send enrollment welcome email asynchronously
+     */
+    @Override
+    @Async("emailTaskExecutor")
+    public CompletableFuture<Void> sendEnrollmentWelcomeEmailAsync(String userEmail, String courseName) {
+        log.debug("Async: Sending welcome email to: {}", userEmail);
+        try {
+            sendEnrollmentWelcomeEmail(userEmail, courseName);
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            log.error("Async: Failed to send welcome email", e);
+            return CompletableFuture.failedFuture(e);
         }
     }
     
