@@ -47,6 +47,31 @@ public interface IOrderRepository extends JpaRepository<OrderEntity, String> {
     @Query("SELECT o FROM OrderEntity o WHERE o.status = :status AND o.createdDate < :beforeTime")
     List<OrderEntity> findByStatusAndCreatedDateBefore(@Param("status") PaymentStatus status,
                                                         @Param("beforeTime") LocalDateTime beforeTime);
-    
+
     List<OrderEntity> findByStatus(PaymentStatus status);
+
+    // Revenue Analytics Queries
+    @Query("SELECT COUNT(o) FROM OrderEntity o WHERE o.status = :status AND o.createdDate BETWEEN :startDate AND :endDate")
+    Long countOrdersByPeriod(@Param("status") PaymentStatus status,
+                             @Param("startDate") LocalDateTime startDate,
+                             @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT CAST(o.createdDate AS date) as date, SUM(o.amount) as revenue, COUNT(o) as orderCount " +
+           "FROM OrderEntity o WHERE o.status = :status " +
+           "AND o.createdDate BETWEEN :startDate AND :endDate " +
+           "GROUP BY CAST(o.createdDate AS date) " +
+           "ORDER BY date ASC")
+    List<Object[]> findDailyRevenue(@Param("status") PaymentStatus status,
+                                    @Param("startDate") LocalDateTime startDate,
+                                    @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT YEAR(o.createdDate) as year, MONTH(o.createdDate) as month, " +
+           "SUM(o.amount) as revenue, COUNT(o) as orderCount " +
+           "FROM OrderEntity o WHERE o.status = :status " +
+           "AND o.createdDate BETWEEN :startDate AND :endDate " +
+           "GROUP BY YEAR(o.createdDate), MONTH(o.createdDate) " +
+           "ORDER BY year ASC, month ASC")
+    List<Object[]> findMonthlyRevenue(@Param("status") PaymentStatus status,
+                                      @Param("startDate") LocalDateTime startDate,
+                                      @Param("endDate") LocalDateTime endDate);
 }

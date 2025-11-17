@@ -2,6 +2,7 @@ package com.lul.Stydu4.controller;
 
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.Dashboard.DashboardStatsResponse;
+import com.lul.Stydu4.dto.response.Dashboard.RevenueAnalyticsResponse;
 import com.lul.Stydu4.service.IDashboardService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -25,18 +26,36 @@ public class DashboardController {
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<DashboardStatsResponse> getDashboardStats(
-            @RequestParam(required = false) 
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) 
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime startDate,
-            
-            @RequestParam(required = false) 
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) 
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime endDate
     ) {
         log.info("Getting dashboard stats from {} to {}", startDate, endDate);
         DashboardStatsResponse stats = dashboardService.getDashboardStats(startDate, endDate);
         return ApiResponse.<DashboardStatsResponse>builder()
                 .result(stats)
+                .build();
+    }
+
+    @GetMapping("/revenue-analytics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<RevenueAnalyticsResponse> getRevenueAnalytics(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime startDate,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime endDate
+    ) {
+        log.info("Getting revenue analytics from {} to {}", startDate, endDate);
+        RevenueAnalyticsResponse analytics = dashboardService.getRevenueAnalytics(startDate, endDate);
+        return ApiResponse.<RevenueAnalyticsResponse>builder()
+                .result(analytics)
                 .build();
     }
 }
