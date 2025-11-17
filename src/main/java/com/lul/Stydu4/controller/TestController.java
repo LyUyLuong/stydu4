@@ -107,6 +107,7 @@ public class TestController {
 
 
     @GetMapping("/{testId}")
+    @PreAuthorize("permitAll()")
     ApiResponse<TestDetailResponse> getTest(@PathVariable String testId) {
         return ApiResponse.<TestDetailResponse>builder()
                 .result(testService.getTestById(testId))

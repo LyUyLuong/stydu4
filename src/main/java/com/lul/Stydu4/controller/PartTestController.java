@@ -3,14 +3,11 @@ package com.lul.Stydu4.controller;
 import com.lul.Stydu4.dto.request.PartTest.PartTestCreationRequest;
 import com.lul.Stydu4.dto.request.PartTest.PartTestSearchRequest;
 import com.lul.Stydu4.dto.request.PartTest.PartTestUpdateRequest;
-import com.lul.Stydu4.dto.request.Test.TestSearchRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestDetailResponse;
 import com.lul.Stydu4.dto.response.PartTest.PartTestSummaryResponse;
-import com.lul.Stydu4.dto.response.Test.TestSummaryResponse;
 import com.lul.Stydu4.enums.PartType;
-import com.lul.Stydu4.enums.TestType;
 import com.lul.Stydu4.service.IPartTestService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -85,7 +82,7 @@ public class PartTestController {
     @GetMapping("/types")
     ApiResponse<List<PartTestTypeDto>> getPartTestTypes() {
         List<PartTestTypeDto> types = Arrays.stream(PartType.values())
-                .map(type -> new PartTestTypeDto(type.getPartType(), type.getPartName()))
+                .map(type -> new PartTestTypeDto(type.name(), type.getPartName()))
                 .collect(Collectors.toList());
 
         return ApiResponse.<List<PartTestTypeDto>>builder()

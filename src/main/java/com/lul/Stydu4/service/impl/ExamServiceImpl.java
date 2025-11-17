@@ -140,7 +140,7 @@ public class ExamServiceImpl implements IExamService {
         );
 
         // 5. Calculate scores
-        ExamScores scores = calculateScores(processingResult, context.isFullTest());
+        ExamScores scores = calculateScores(processingResult, context);
 
         // 6. Update and save results
         Duration duration = Duration.between(startTime, LocalDateTime.now());
@@ -568,27 +568,45 @@ public class ExamServiceImpl implements IExamService {
         return new ProcessedQuestionData(userAnswerEntity, questionResult, isCorrect);
     }
 
-    private ExamScores calculateScores(ExamProcessingResult result, boolean isFullTest) {
+    private ExamScores calculateScores(ExamProcessingResult result, ExamContext context) {
         int listeningScore = 0;
         int readingScore = 0;
 
-        if (isFullTest) {
-            listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
-            readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
-        } else {
+        // Check if this is an IELTS test
+        boolean isIeltsTest = context.getTest().getType().getType().equals("IELTS");
+
+        if (isIeltsTest) {
+            // IELTS scoring - convert raw scores to band scores (0-9 scale)
             if (result.getListeningTotal() > 0) {
-                listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                listeningScore = convertToIeltsBandScore(result.getListeningCorrect());
             }
             if (result.getReadingTotal() > 0) {
-                readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+                readingScore = convertToIeltsBandScore(result.getReadingCorrect());
             }
+
+            log.info("=== IELTS BAND SCORES ===");
+            log.info("Listening Band: {}", formatIeltsBandScore(listeningScore));
+            log.info("Reading Band: {}", formatIeltsBandScore(readingScore));
+        } else {
+            // TOEIC scoring - convert to 5-495 scale
+            if (context.isFullTest()) {
+                listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+            } else {
+                if (result.getListeningTotal() > 0) {
+                    listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                }
+                if (result.getReadingTotal() > 0) {
+                    readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+                }
+            }
+
+            log.info("=== TOEIC SCORES ===");
+            log.info("Listening Score: {}", listeningScore);
+            log.info("Reading Score: {}", readingScore);
         }
 
         int totalScore = listeningScore + readingScore;
-
-        log.info("=== SCORES ===");
-        log.info("Listening Score: {}", listeningScore);
-        log.info("Reading Score: {}", readingScore);
         log.info("Total Score: {}", totalScore);
 
         return new ExamScores(listeningScore, readingScore, totalScore);
@@ -844,10 +862,19 @@ public class ExamServiceImpl implements IExamService {
     }
 
     private static boolean isListeningPart(PartType partType) {
-        return partType == PartType.PART_1_TOEIC ||
+        // TOEIC Listening Parts
+        boolean isToeicListening = partType == PartType.PART_1_TOEIC ||
                 partType == PartType.PART_2_TOEIC ||
                 partType == PartType.PART_3_TOEIC ||
                 partType == PartType.PART_4_TOEIC;
+
+        // IELTS Listening Sections
+        boolean isIeltsListening = partType == PartType.LISTENING_SECTION_1_IELTS ||
+                partType == PartType.LISTENING_SECTION_2_IELTS ||
+                partType == PartType.LISTENING_SECTION_3_IELTS ||
+                partType == PartType.LISTENING_SECTION_4_IELTS;
+
+        return isToeicListening || isIeltsListening;
     }
 
     private Integer convertToToeicScore(int correctAnswers, int totalQuestions) {
@@ -862,6 +889,74 @@ public class ExamServiceImpl implements IExamService {
         if (scaledScore > 495) scaledScore = 495;
 
         return scaledScore;
+    }
+
+    /**
+     * Convert raw IELTS score to band score (stored as integer * 10)
+     * For example: Band 6.5 is stored as 65, Band 7.0 is stored as 70
+     * This allows us to store band scores as integers while preserving the 0.5 increments
+     */
+    private Integer convertToIeltsBandScore(int correctAnswers) {
+        // IELTS Listening/Reading conversion table (40 questions max)
+        // Band scores: 0.0 to 9.0 in 0.5 increments
+        if (correctAnswers < 0) correctAnswers = 0;
+        if (correctAnswers > 40) correctAnswers = 40;
+
+        // Conversion table based on official IELTS scoring
+        int[] bandScores = {
+            0,   // 0 correct = 0.0 band
+            0,   // 1 correct = 0.0 band
+            0,   // 2 correct = 0.0 band
+            0,   // 3 correct = 0.0 band
+            10,  // 4 correct = 1.0 band
+            20,  // 5 correct = 2.0 band
+            25,  // 6 correct = 2.5 band
+            30,  // 7 correct = 3.0 band
+            30,  // 8 correct = 3.0 band
+            35,  // 9 correct = 3.5 band
+            40,  // 10 correct = 4.0 band
+            40,  // 11 correct = 4.0 band
+            40,  // 12 correct = 4.0 band
+            45,  // 13 correct = 4.5 band
+            45,  // 14 correct = 4.5 band
+            50,  // 15 correct = 5.0 band
+            50,  // 16 correct = 5.0 band
+            50,  // 17 correct = 5.0 band
+            55,  // 18 correct = 5.5 band
+            55,  // 19 correct = 5.5 band
+            60,  // 20 correct = 6.0 band
+            60,  // 21 correct = 6.0 band
+            60,  // 22 correct = 6.0 band
+            65,  // 23 correct = 6.5 band
+            65,  // 24 correct = 6.5 band
+            65,  // 25 correct = 6.5 band
+            70,  // 26 correct = 7.0 band
+            70,  // 27 correct = 7.0 band
+            70,  // 28 correct = 7.0 band
+            70,  // 29 correct = 7.0 band
+            75,  // 30 correct = 7.5 band
+            75,  // 31 correct = 7.5 band
+            80,  // 32 correct = 8.0 band
+            80,  // 33 correct = 8.0 band
+            80,  // 34 correct = 8.0 band
+            85,  // 35 correct = 8.5 band
+            85,  // 36 correct = 8.5 band
+            85,  // 37 correct = 8.5 band
+            90,  // 38 correct = 9.0 band
+            90,  // 39 correct = 9.0 band
+            90   // 40 correct = 9.0 band
+        };
+
+        return bandScores[correctAnswers];
+    }
+
+    /**
+     * Format IELTS band score for display
+     * Converts stored integer (e.g., 65) to band score string (e.g., "6.5")
+     */
+    private String formatIeltsBandScore(int bandScoreInt) {
+        double bandScore = bandScoreInt / 10.0;
+        return String.format("%.1f", bandScore);
     }
 
     private String formatDuration(Object completeTime) {

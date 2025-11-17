@@ -141,17 +141,18 @@ public class TestServiceImpl implements ITestService {
         // Cập nhật các trường đơn lẻ; null sẽ bị bỏ qua theo cấu hình mapper
         testMapper.updateTestEntityFromRequest(request, existing);
 
-        // Auto-update slug if name changed and slug is empty
-        if (request.getName() != null && !request.getName().trim().isEmpty()) {
-            if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
-                // Only regenerate if name is different
-                if (!request.getName().equals(existing.getName())) {
-                    existing.setSlug(SlugHelper.toUniqueSlug(request.getName()));
-                }
-            } else {
-                // Normalize provided slug
-                existing.setSlug(SlugHelper.toSlug(request.getSlug()));
+        // Auto-update slug if slug is empty
+        if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
+            // Generate slug from new name if provided, otherwise use existing name
+            String nameToUse = (request.getName() != null && !request.getName().trim().isEmpty()) 
+                    ? request.getName() 
+                    : existing.getName();
+            if (nameToUse != null && !nameToUse.trim().isEmpty()) {
+                existing.setSlug(SlugHelper.toUniqueSlug(nameToUse));
             }
+        } else {
+            // Normalize provided slug
+            existing.setSlug(SlugHelper.toSlug(request.getSlug()));
         }
 
         // Ngữ nghĩa:
