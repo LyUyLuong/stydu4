@@ -23,6 +23,7 @@ public class ResultEntity extends BaseEntity {
 
     private Integer readingPoint;
     private Integer listeningPoint;
+    private Integer totalPoint;  // Overall score (IELTS: average band, TOEIC: sum)
     private Integer readingCorrectAnswer;
     private Integer listeningCorrectAnswer;
     private Long  completeTime;

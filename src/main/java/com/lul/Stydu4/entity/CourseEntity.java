@@ -49,4 +49,7 @@ public class CourseEntity extends BaseEntity {
 
     @OneToMany(mappedBy = "course")
     private List<EnrollmentEntity> enrollments;
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<LectureEntity> lectures;
 }

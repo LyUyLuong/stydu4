@@ -45,3 +45,6 @@ logs/*.log
 *.md
 logs/error.log
 logs/stydu4.log
+
+### Migration Files ###
+migration_fix_parttype_enum.sql

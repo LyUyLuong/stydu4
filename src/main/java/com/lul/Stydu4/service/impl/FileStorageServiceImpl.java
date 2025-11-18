@@ -209,11 +209,26 @@ public class FileStorageServiceImpl implements IFileStorageService {
         }
 
         String extension = getFileExtension(filename);
-        FileStorageProperties.FileConfig config = fileType == FileType.IMAGE
-                ? fileStorageProperties.getUpload().getImages()
-                : fileStorageProperties.getUpload().getAudio();
+        FileStorageProperties.FileConfig config;
 
-        if (config.getAllowedExtensions() != null &&
+        switch (fileType) {
+            case IMAGE:
+                config = fileStorageProperties.getUpload().getImages();
+                break;
+            case AUDIO:
+                config = fileStorageProperties.getUpload().getAudio();
+                break;
+            case VIDEO:
+                config = fileStorageProperties.getUpload().getVideos();
+                break;
+            case DOCUMENT:
+                config = fileStorageProperties.getUpload().getDocuments();
+                break;
+            default:
+                config = fileStorageProperties.getUpload().getDocuments();
+        }
+
+        if (config != null && config.getAllowedExtensions() != null &&
                 !config.getAllowedExtensions().contains(extension.toLowerCase())) {
             log.error("Invalid file extension: {}. Allowed: {}",
                     extension, config.getAllowedExtensions());

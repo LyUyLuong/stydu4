@@ -81,6 +81,56 @@ public class FileController {
     }
 
     /**
+     * Upload video file
+     */
+    @PostMapping("/upload/video")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<FileEntity>> uploadVideo(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "subFolder", defaultValue = "general") String subFolder,
+            @RequestParam(value = "description", required = false) String description
+    ) {
+        log.info("Uploading video: {}, subFolder: {}", file.getOriginalFilename(), subFolder);
+
+        FileEntity savedFile = fileStorageService.storeFile(file, FileType.VIDEO, subFolder);
+
+        if (description != null) {
+            savedFile.setDescription(description);
+        }
+
+        return ResponseEntity.ok(ApiResponse.<FileEntity>builder()
+                .code(1000)
+                .message("Video uploaded successfully")
+                .result(savedFile)
+                .build());
+    }
+
+    /**
+     * Upload document file
+     */
+    @PostMapping("/upload/document")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<FileEntity>> uploadDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "subFolder", defaultValue = "general") String subFolder,
+            @RequestParam(value = "description", required = false) String description
+    ) {
+        log.info("Uploading document: {}, subFolder: {}", file.getOriginalFilename(), subFolder);
+
+        FileEntity savedFile = fileStorageService.storeFile(file, FileType.DOCUMENT, subFolder);
+
+        if (description != null) {
+            savedFile.setDescription(description);
+        }
+
+        return ResponseEntity.ok(ApiResponse.<FileEntity>builder()
+                .code(1000)
+                .message("Document uploaded successfully")
+                .result(savedFile)
+                .build());
+    }
+
+    /**
      * Download/Stream file by ID
      */
     @GetMapping("/{fileId}")

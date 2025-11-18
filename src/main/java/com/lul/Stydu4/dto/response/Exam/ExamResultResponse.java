@@ -15,6 +15,7 @@ public class ExamResultResponse {
     String resultId;
     String testId;
     String testName;
+    String testType;
     String userId;
     String userName;
 

@@ -122,7 +122,19 @@ public enum ErrorCode {
     // ============================================
     ORDER_NOT_FOUND(9400, "Order not found", HttpStatus.NOT_FOUND),
     ORDER_ALREADY_COMPLETED(9401, "Order already completed", HttpStatus.CONFLICT),
-    ORDER_ALREADY_CANCELLED(9402, "Order already cancelled", HttpStatus.CONFLICT)
+    ORDER_ALREADY_CANCELLED(9402, "Order already cancelled", HttpStatus.CONFLICT),
+
+    // ============================================
+    // LECTURE ERRORS (95xx)
+    // ============================================
+    LECTURE_NOT_FOUND(9500, "Lecture not found", HttpStatus.NOT_FOUND),
+    LECTURE_ALREADY_PUBLISHED(9501, "Lecture already published", HttpStatus.CONFLICT),
+    LECTURE_NOT_PUBLISHED(9502, "Lecture is not published", HttpStatus.BAD_REQUEST),
+
+    // ============================================
+    // VALIDATION ERRORS (99xx)
+    // ============================================
+    INVALID_REQUEST(9900, "Invalid request", HttpStatus.BAD_REQUEST)
     ;
 
     ErrorCode(int code, String message, HttpStatus statusCode) {

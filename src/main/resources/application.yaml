@@ -116,3 +116,9 @@ file:
     audio:
       allowed-extensions: mp3,wav,m4a,ogg,aac
       max-size: 100MB
+    videos:
+      allowed-extensions: mp4,webm,avi,mov,mkv,flv,wmv
+      max-size: 100MB
+    documents:
+      allowed-extensions: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar
+      max-size: 50MB

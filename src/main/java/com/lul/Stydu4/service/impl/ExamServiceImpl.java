@@ -180,17 +180,17 @@ public class ExamServiceImpl implements IExamService {
         List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
 
         Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
-        Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
 
         return ExamResultResponse.builder()
                 .resultId(result.getId())
                 .testId(result.getTest().getId())
                 .testName(result.getTest().getName())
+                .testType(result.getTest().getType().name())
                 .userId(result.getUser().getId())
                 .userName(result.getUser().getUsername())
                 .isFullTest(result.getIsFullTest())
                 .completedPartIds(completedPartIds)
-                .totalScore(totalScore)
+                .totalScore(result.getTotalPoint())
                 .listeningScore(result.getListeningPoint())
                 .readingScore(result.getReadingPoint())
                 .totalCorrectAnswers(totalCorrect)
@@ -578,15 +578,15 @@ public class ExamServiceImpl implements IExamService {
         if (isIeltsTest) {
             // IELTS scoring - convert raw scores to band scores (0-9 scale)
             if (result.getListeningTotal() > 0) {
-                listeningScore = convertToIeltsBandScore(result.getListeningCorrect());
+                listeningScore = convertToIeltsBandScore(result.getListeningCorrect(), result.getListeningTotal());
             }
             if (result.getReadingTotal() > 0) {
-                readingScore = convertToIeltsBandScore(result.getReadingCorrect());
+                readingScore = convertToIeltsBandScore(result.getReadingCorrect(), result.getReadingTotal());
             }
 
             log.info("=== IELTS BAND SCORES ===");
-            log.info("Listening Band: {}", formatIeltsBandScore(listeningScore));
-            log.info("Reading Band: {}", formatIeltsBandScore(readingScore));
+            log.info("Listening: {}/{} correct -> Band {}", result.getListeningCorrect(), result.getListeningTotal(), formatIeltsBandScore(listeningScore));
+            log.info("Reading: {}/{} correct -> Band {}", result.getReadingCorrect(), result.getReadingTotal(), formatIeltsBandScore(readingScore));
         } else {
             // TOEIC scoring - convert to 5-495 scale
             if (context.isFullTest()) {
@@ -606,8 +606,37 @@ public class ExamServiceImpl implements IExamService {
             log.info("Reading Score: {}", readingScore);
         }
 
-        int totalScore = listeningScore + readingScore;
-        log.info("Total Score: {}", totalScore);
+        int totalScore;
+        if (isIeltsTest) {
+            // IELTS: Overall band score is the AVERAGE of all components, rounded to nearest 0.5
+            // Since scores are stored as int * 10, we calculate average and round
+            int sectionsCompleted = 0;
+            int sumScores = 0;
+
+            if (result.getListeningTotal() > 0) {
+                sumScores += listeningScore;
+                sectionsCompleted++;
+            }
+            if (result.getReadingTotal() > 0) {
+                sumScores += readingScore;
+                sectionsCompleted++;
+            }
+
+            if (sectionsCompleted > 0) {
+                // Calculate average (still in int * 10 format)
+                double averageScore = (double) sumScores / sectionsCompleted;
+                // Round to nearest 0.5 (nearest 5 in int * 10 format)
+                totalScore = (int) (Math.round(averageScore / 5.0) * 5);
+            } else {
+                totalScore = 0;
+            }
+
+            log.info("Overall Band Score: {} (average of {} sections)", formatIeltsBandScore(totalScore), sectionsCompleted);
+        } else {
+            // TOEIC: Total is sum
+            totalScore = listeningScore + readingScore;
+            log.info("Total Score: {}", totalScore);
+        }
 
         return new ExamScores(listeningScore, readingScore, totalScore);
     }
@@ -620,6 +649,7 @@ public class ExamServiceImpl implements IExamService {
     ) {
         result.setReadingPoint(scores.getReadingScore());
         result.setListeningPoint(scores.getListeningScore());
+        result.setTotalPoint(scores.getTotalScore());
         result.setReadingCorrectAnswer(processingResult.getReadingCorrect());
         result.setListeningCorrectAnswer(processingResult.getListeningCorrect());
         result.setCompleteTime(duration);
@@ -670,6 +700,7 @@ public class ExamServiceImpl implements IExamService {
                 .resultId(savedResult.getId())
                 .testId(context.getTest().getId())
                 .testName(context.getTest().getName())
+                .testType(context.getTest().getType().name())
                 .userId(context.getUser().getId())
                 .userName(context.getUser().getUsername())
                 .isFullTest(context.isFullTest())
@@ -836,17 +867,17 @@ public class ExamServiceImpl implements IExamService {
         List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
 
         Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
-        Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
 
         return ExamResultResponse.builder()
                 .resultId(result.getId())
                 .testId(result.getTest().getId())
                 .testName(result.getTest().getName())
+                .testType(result.getTest().getType().name())
                 .userId(result.getUser().getId())
                 .userName(result.getUser().getUsername())
                 .isFullTest(result.getIsFullTest())
                 .completedPartIds(completedPartIds)
-                .totalScore(totalScore)
+                .totalScore(result.getTotalPoint())
                 .listeningScore(result.getListeningPoint())
                 .readingScore(result.getReadingPoint())
                 .totalCorrectAnswers(totalCorrect)
@@ -895,12 +926,33 @@ public class ExamServiceImpl implements IExamService {
      * Convert raw IELTS score to band score (stored as integer * 10)
      * For example: Band 6.5 is stored as 65, Band 7.0 is stored as 70
      * This allows us to store band scores as integers while preserving the 0.5 increments
+     *
+     * @param correctAnswers Number of correct answers
+     * @param totalQuestions Total number of questions in the test
+     * @return Band score as integer * 10 (e.g., 65 for band 6.5)
      */
-    private Integer convertToIeltsBandScore(int correctAnswers) {
+    private Integer convertToIeltsBandScore(int correctAnswers, int totalQuestions) {
+        // Handle edge cases
+        if (correctAnswers < 0) correctAnswers = 0;
+        if (totalQuestions <= 0) return 0;
+        if (correctAnswers > totalQuestions) correctAnswers = totalQuestions;
+
+        // If test has fewer than 40 questions, scale to 40 for conversion
+        // Example: 3/4 correct = 75% = 30/40 for conversion table
+        int scaledCorrectAnswers;
+        if (totalQuestions < 40) {
+            double percentage = (double) correctAnswers / totalQuestions;
+            scaledCorrectAnswers = (int) Math.round(percentage * 40);
+            log.debug("Scaled {}/{} questions to {}/40 for IELTS conversion",
+                correctAnswers, totalQuestions, scaledCorrectAnswers);
+        } else {
+            scaledCorrectAnswers = correctAnswers;
+        }
+
         // IELTS Listening/Reading conversion table (40 questions max)
         // Band scores: 0.0 to 9.0 in 0.5 increments
-        if (correctAnswers < 0) correctAnswers = 0;
-        if (correctAnswers > 40) correctAnswers = 40;
+        if (scaledCorrectAnswers < 0) scaledCorrectAnswers = 0;
+        if (scaledCorrectAnswers > 40) scaledCorrectAnswers = 40;
 
         // Conversion table based on official IELTS scoring
         int[] bandScores = {
@@ -947,7 +999,7 @@ public class ExamServiceImpl implements IExamService {
             90   // 40 correct = 9.0 band
         };
 
-        return bandScores[correctAnswers];
+        return bandScores[scaledCorrectAnswers];
     }
 
     /**
