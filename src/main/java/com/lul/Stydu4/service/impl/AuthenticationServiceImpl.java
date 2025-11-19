@@ -174,7 +174,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
             long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000;
             if (ttl > 0) {
-//                jwtBlacklistService.blacklistToken(jit, ttl);
+               jwtBlacklistService.blacklistToken(jit, ttl);
             }
         } catch (Exception e) {
             log.info("Logout called with invalid or expired token, ignoring: {}", e.getMessage());
@@ -226,7 +226,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         long ttl = (expiryTime.getTime() - System.currentTimeMillis()) / 1000;
         if (ttl > 0) {
-//            jwtBlacklistService.blacklistToken(jit, ttl);
+           jwtBlacklistService.blacklistToken(jit, ttl);
         }
 
         String token = generateToken(user);
