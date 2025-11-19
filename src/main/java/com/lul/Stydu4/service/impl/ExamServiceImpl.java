@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -123,7 +123,22 @@ public class ExamServiceImpl implements IExamService {
     public ExamResultResponse submitExam(SubmitExamRequest request, String userName) {
         log.info("=== STARTING EXAM SUBMISSION ===");
         log.info("User: {}, Test: {}, Parts: {}", userName, request.getTestId(), request.getPartIds());
-        LocalDateTime startTime = LocalDateTime.now();
+
+        // Validate start time
+        Instant startedAt = request.getStartedAt();
+        Instant now = Instant.now();
+
+        if (startedAt == null) {
+            log.error("Start time is required but was null");
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        if (startedAt.isAfter(now)) {
+            log.error("Start time {} is in the future (now: {})", startedAt, now);
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        log.info("Exam started at: {}, submitting at: {}", startedAt, now);
 
         // 1. Load and validate exam context
         ExamContext context = loadExamContext(request, userName);
@@ -142,8 +157,18 @@ public class ExamServiceImpl implements IExamService {
         // 5. Calculate scores
         ExamScores scores = calculateScores(processingResult, context);
 
-        // 6. Update and save results
-        Duration duration = Duration.between(startTime, LocalDateTime.now());
+        // 6. Calculate actual exam duration
+        // ✅ NEW: Prioritize duration from frontend (more accurate, accounts for client-side time)
+        // If frontend provides durationSeconds, use it; otherwise calculate from startedAt to now
+        Duration duration;
+        if (request.getDurationSeconds() != null && request.getDurationSeconds() > 0) {
+            duration = Duration.ofSeconds(request.getDurationSeconds());
+            log.info("Using duration from frontend: {} seconds", duration.toSeconds());
+        } else {
+            duration = Duration.between(startedAt, now);
+            log.info("Calculated duration from server timestamps: {} seconds (startedAt: {}, now: {})", 
+                    duration.toSeconds(), startedAt, now);
+        }
         updateAndSaveResults(savedResult, processingResult, scores, duration);
 
         // 7. Save part results
