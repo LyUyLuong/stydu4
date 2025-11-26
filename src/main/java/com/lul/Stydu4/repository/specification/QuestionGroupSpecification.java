@@ -19,6 +19,7 @@ public class QuestionGroupSpecification {
                 nameLike(request.getName()),
                 typeEquals(request.getType()),
                 partNameLike(request.getPartName()),
+                partIdEquals(request.getPartId()),  // ✅ Add Part ID filter
                 createdBetween(request.getCreatedFrom(), request.getCreatedTo())
         );
     }
@@ -45,7 +46,8 @@ public class QuestionGroupSpecification {
             if (type == null || type.isBlank()) {
                 return null;
             }
-            return cb.equal(cb.lower(root.get("type")), type.toLowerCase().trim());
+            // ✅ Use exact match with uppercase (types are usually stored in uppercase)
+            return cb.equal(root.get("type"), type.toUpperCase().trim());
         };
     }
 
@@ -61,6 +63,18 @@ public class QuestionGroupSpecification {
                     cb.lower(root.get("partEntity").get("name")),
                     "%" + partName.toLowerCase().trim() + "%"
             );
+        };
+    }
+
+    /**
+     * ✅ Tìm kiếm theo Part ID (exact match)
+     */
+    private static Specification<QuestionGroupEntity> partIdEquals(String partId) {
+        return (root, query, cb) -> {
+            if (partId == null || partId.isBlank()) {
+                return null;
+            }
+            return cb.equal(root.get("partEntity").get("id"), partId.trim());
         };
     }
 

@@ -7,7 +7,7 @@ public enum QuestionType {
 
     MULTIPLE_CHOICE("MULTIPLE_CHOICE","Multiple Choice"),
     TRUE_FALSE("TRUE_FALSE","True/False"),
-    SHORT_ANSWER("SHORT_ANSWER","Short Answer");
+    FILL_IN_BLANK("FILL_IN_BLANK","Fill in the Blank");
 
 
     QuestionType(String type, String name){

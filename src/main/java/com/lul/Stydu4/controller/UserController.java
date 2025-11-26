@@ -34,21 +34,6 @@ public class UserController {
     IUserService userService;
 
     @PostMapping
-    @Operation(
-            summary = "Create new user",
-            description = "Register a new user account with username, email, password and other details. This endpoint is public and doesn't require authentication."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "User created successfully",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid input data or user already exists"
-            )
-    })
     ApiResponse<UserResponse> createUser(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "User creation request with required fields",

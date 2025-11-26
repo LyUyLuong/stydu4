@@ -85,12 +85,15 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Override
     public IntrospectResponse introspect(IntrospectRequest request) throws JOSEException, ParseException {
         String token = request.getToken();
+        
+        log.debug("Introspecting token: {}", token.substring(0, Math.min(50, token.length())) + "...");
 
         boolean isValid = true;
 
         try {
             verify(token,false);
         } catch (AppException | ParseException | JOSEException e) {
+            log.error("Token introspection error: {}", e.getMessage(), e);
             isValid = false;
         }
 
@@ -105,25 +108,33 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     public String generateToken(UserEntity user) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
-        JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
+        // Sử dụng Builder để dễ dàng thêm claim
+        JWTClaimsSet.Builder claimsBuilder = new JWTClaimsSet.Builder()
                 .subject(user.getUsername())
-                .issuer("Stydu4")
+                .issuer("Stydu4") // Giữ nguyên issuer này
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
                 .claim("scope", buildScope(user))
-                .jwtID(UUID.randomUUID().toString())
-                .build();
+                .claim("userId", user.getId()) // Luôn thêm userId
+                .jwtID(UUID.randomUUID().toString());
 
+
+        // Chỉ thêm authProvider nếu nó không phải là LOCAL (hoặc không null)
+        if (user.getAuthProvider() != null && user.getAuthProvider() != AuthProvider.LOCAL) {
+            claimsBuilder.claim("authProvider", user.getAuthProvider().name());
+        }
+        // ==================================
+
+        JWTClaimsSet jwtClaimsSet = claimsBuilder.build();
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
-
-        JWSObject jwsObject = new JWSObject(header,payload);
+        JWSObject jwsObject = new JWSObject(header, payload);
 
         try {
             jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
             return jwsObject.serialize();
         } catch (JOSEException e) {
-        log.error("Cannot create token", e);
-        throw new RuntimeException(e);
+            log.error("Cannot create token", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -163,7 +174,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
             long ttl = (expirationTime.getTime() - System.currentTimeMillis()) / 1000;
             if (ttl > 0) {
-                jwtBlacklistService.blacklistToken(jit, ttl);
+               jwtBlacklistService.blacklistToken(jit, ttl);
             }
         } catch (Exception e) {
             log.info("Logout called with invalid or expired token, ignoring: {}", e.getMessage());
@@ -182,7 +193,16 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         boolean isAuthenticated =  signedJWT.verify(verifier);
 
-        if(!isAuthenticated || expiryTime.before(new Date())){
+        log.debug("Token verification - isAuthenticated: {}, expiryTime: {}, now: {}", 
+                  isAuthenticated, expiryTime, new Date());
+
+        if(!isAuthenticated){
+            log.error("Token signature verification failed!");
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        
+        if(expiryTime.before(new Date())){
+            log.error("Token expired! Expiry: {}, Now: {}", expiryTime, new Date());
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
@@ -206,7 +226,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
 
         long ttl = (expiryTime.getTime() - System.currentTimeMillis()) / 1000;
         if (ttl > 0) {
-            jwtBlacklistService.blacklistToken(jit, ttl);
+           jwtBlacklistService.blacklistToken(jit, ttl);
         }
 
         String token = generateToken(user);
@@ -218,9 +238,23 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     }
 
     // Trong AuthenticationServiceImpl
-    @Override
     @Transactional(readOnly = true)
-    public String generateTokenForOAuth2User(UserEntity user) {
+    @Override
+    public AuthenticationResponse generateTokenForOAuth2User(UserEntity user) {
+        String token = generateToken(user);
+        String refreshToken = generateRefreshToken(user);
+
+        return AuthenticationResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .authenticated(true)
+                .build();
+    }
+
+    /**
+     * Generate refresh token
+     */
+    private String generateRefreshToken(UserEntity user) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
         JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
@@ -228,12 +262,11 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 .issuer("stydu4.com")
                 .issueTime(new Date())
                 .expirationTime(new Date(
-                        Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()
+                        Instant.now().plus(REFRESHABLE_DURATION, ChronoUnit.SECONDS).toEpochMilli()
                 ))
                 .jwtID(UUID.randomUUID().toString())
                 .claim("scope", buildScope(user))
                 .claim("userId", user.getId())
-                .claim("authProvider", user.getAuthProvider().name())
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -243,7 +276,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
             jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
             return jwsObject.serialize();
         } catch (JOSEException e) {
-            log.error("Cannot create token", e);
+            log.error("Cannot create refresh token", e);
             throw new RuntimeException(e);
         }
     }

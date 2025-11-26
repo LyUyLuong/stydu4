@@ -7,17 +7,22 @@ import com.lul.Stydu4.dto.response.Course.CourseResponse;
 import com.lul.Stydu4.dto.response.Course.EnrollmentResponse;
 import com.lul.Stydu4.dto.response.Course.PaymentResponse;
 import com.lul.Stydu4.entity.CourseEntity;
+import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.entity.UserEntity;
+import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.repository.IUserRepository;
 import com.lul.Stydu4.service.ICourseService;
 import com.lul.Stydu4.service.IEnrollmentService;
+import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.IPaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -31,12 +36,25 @@ public class CourseController {
     private final IPaymentService paymentService;
     private final IEnrollmentService enrollmentService;
     private final IUserRepository userRepository;
+    private final IFileStorageService fileStorageService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<CourseResponse>> createCourse(
             @RequestBody CourseCreationRequest request) {
-        
+
         CourseResponse response = courseService.createCourse(request);
+        return ResponseEntity.ok(ApiResponse.<CourseResponse>builder()
+                .result(response)
+                .build());
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CourseResponse>> updateCourse(
+            @PathVariable String id,
+            @RequestBody CourseCreationRequest request) {
+
+        CourseResponse response = courseService.updateCourse(id, request);
         return ResponseEntity.ok(ApiResponse.<CourseResponse>builder()
                 .result(response)
                 .build());
@@ -45,6 +63,15 @@ public class CourseController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<CourseResponse>>> getAllCourses() {
         List<CourseResponse> courses = courseService.getAllPublishedCourses();
+        return ResponseEntity.ok(ApiResponse.<List<CourseResponse>>builder()
+                .result(courses)
+                .build());
+    }
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<CourseResponse>>> getAllCoursesForAdmin() {
+        List<CourseResponse> courses = courseService.getAllCourses();
         return ResponseEntity.ok(ApiResponse.<List<CourseResponse>>builder()
                 .result(courses)
                 .build());
@@ -71,7 +98,9 @@ public class CourseController {
                     .build());
         } catch (Exception e) {
             log.error("Error purchasing course: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(ApiResponse.<PaymentResponse>builder()
+                    .message(e.getMessage())
+                    .build());
         }
     }
 
@@ -125,6 +154,7 @@ public class CourseController {
     }
 
     @PutMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> publishCourse(@PathVariable String id) {
         courseService.publishCourse(id);
         return ResponseEntity.ok(ApiResponse.<String>builder()
@@ -133,11 +163,38 @@ public class CourseController {
     }
 
     @PutMapping("/{id}/unpublish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> unpublishCourse(@PathVariable String id) {
         courseService.unpublishCourse(id);
         return ResponseEntity.ok(ApiResponse.<String>builder()
                 .result("Course unpublished")
                 .build());
+    }
+
+    @PostMapping("/{id}/upload-image")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CourseResponse>> uploadCourseImage(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            log.info("Uploading image for course: {}", id);
+
+            // Upload file
+            FileEntity uploadedFile = fileStorageService.storeFile(file, FileType.IMAGE, "courses");
+
+            // Update course with image URL
+            CourseResponse updatedCourse = courseService.updateCourseImage(id, uploadedFile.getFileUrl());
+
+            return ResponseEntity.ok(ApiResponse.<CourseResponse>builder()
+                    .message("Course image uploaded successfully")
+                    .result(updatedCourse)
+                    .build());
+        } catch (Exception e) {
+            log.error("Error uploading course image: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.<CourseResponse>builder()
+                    .message(e.getMessage())
+                    .build());
+        }
     }
 
     private UserEntity getCurrentUser() {

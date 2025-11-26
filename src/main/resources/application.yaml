@@ -1,34 +1,9 @@
-server:
-  port: 8080
-
-app:
-  frontend:
-    url: http://localhost:5500  # URL của frontend
-    base-url: http://localhost:8080
-
-application:
-  swagger:
-    dev-url: http://localhost:8080
-    prod-url: https://api.stydu4.com
-
+# Đặt profile mặc định là 'dev'
 spring:
+  profiles:
+    active: dev
   application:
     name: Stydu4
-  datasource:
-    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
-
-    username: root
-    password: luong123
-  jpa:
-    database: mysql
-    hibernate:
-      #ddl-auto: none
-      #ddl-auto: create
-      ddl-auto: update
-      #ddl-auto: create-drop
-    properties:
-      format_sql: true
-    show-sql: true
   data:
     redis:
       host: localhost
@@ -39,27 +14,71 @@ spring:
       client:
         registration:
           google:
-
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
+            redirect-uri: "http://localhost:${server.port}/api/v1/login/oauth2/code/google"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
   servlet:
     multipart:
       enabled: true
       max-file-size: 100MB
       max-request-size: 200MB
       file-size-threshold: 2MB
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:yeppymine@gmail.com}
+    password: ${MAIL_PASSWORD:}  # ← MUST use environment variable!
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  servlet:
+    context-path: /api/v1
+
+app:
+  frontend:
+    url: http://localhost:5173
+    base-url: http://localhost:${server.port}
+
+application:
+  swagger:
+    dev-url: http://localhost:${server.port}
+    prod-url: https://api.stydu4.com
 
 jwt:
-  signerKey: "cxwHya1whYAEv/LiFOjn928sU0kL/F953Ba2TLePb+tCM5usAtSnIMGXE2QYNIpb"
+  signerKey: ${JWT_SIGNER_KEY}
   valid-duration: 36000 # in seconds
   refreshable-duration: 36000 # in seconds
 
 # Stripe Configuration
 stripe:
-  api-key: sk_test_51SLi9wEj6cJw1XKH4DZQAxwEz92znmIRbpJic8mddbZGOFvRjknqCkaND8QyZdItuZ2inF44nBOB1X7gbveTm1bG000v29Vf06  # Get from https://dashboard.stripe.com/test/apikeys
+  api-key: ${STRIPE_API_KEY}
   success-url: ${app.frontend.url}/payment/success?session_id={CHECKOUT_SESSION_ID}
   cancel-url: ${app.frontend.url}/payment/cancel
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET}
+
+# Email Configuration
+email:
+  from: ${EMAIL_FROM:noreply@stydu4.com}
+  enabled: ${EMAIL_ENABLED:true}
 
 # Logging Configuration
 logging:
@@ -70,37 +89,26 @@ logging:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} [%t] %-40.40logger{39} : %m%n"
   level:
-    # Root level
     root: INFO
-    
-    # Application packages
     com.lul.Stydu4: DEBUG
     com.lul.Stydu4.controller: DEBUG
     com.lul.Stydu4.service: DEBUG
     com.lul.Stydu4.repository: DEBUG
     com.lul.Stydu4.security: INFO
     com.lul.Stydu4.exception: DEBUG
-    
-    # Spring Framework
     org.springframework.web: INFO
     org.springframework.security: INFO
     org.springframework.boot: INFO
     org.springframework.data: INFO
-    
-    # Hibernate/JPA
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type: INFO
-    
-    # Redis
     org.springframework.data.redis: INFO
-    
-    # OAuth2
     org.springframework.security.oauth2: DEBUG
 
 file:
   storage:
-    location: D:/toeic-storage  # Change to your path
+    location: D:/toeic-storage
   upload:
     images:
       allowed-extensions: jpg,jpeg,png,gif,webp,svg
@@ -108,3 +116,9 @@ file:
     audio:
       allowed-extensions: mp3,wav,m4a,ogg,aac
       max-size: 100MB
+    videos:
+      allowed-extensions: mp4,webm,avi,mov,mkv,flv,wmv
+      max-size: 100MB
+    documents:
+      allowed-extensions: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar
+      max-size: 50MB

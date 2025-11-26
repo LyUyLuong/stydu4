@@ -23,6 +23,8 @@ public class FileStorageProperties {
     public static class Upload {
         private FileConfig images = new FileConfig();
         private FileConfig audio = new FileConfig();
+        private FileConfig videos = new FileConfig();
+        private FileConfig documents = new FileConfig();
     }
 
     @Data

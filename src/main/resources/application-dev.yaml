@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/stydu5?createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:luong123}
+    hikari:
+      # Connection pool configuration
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # Connection leak detection (30 seconds)
+      leak-detection-threshold: 30000
+      # Pool name for logging
+      pool-name: Stydu4HikariCP
+      # Test connection on checkout
+      connection-test-query: SELECT 1
+  jpa:
+    database: mysql
+    hibernate:
+      ddl-auto: update
+    properties:
+      format_sql: true
+    show-sql: true
+
+
+
+logging:
+  level:
+    org:
+      springframework:
+       security=DEBUG:

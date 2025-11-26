@@ -498,7 +498,7 @@ public class PartTestServiceImplTest {
 
     @Test
     void getPartTestById_Success() {
-        when(partTestRepository.findById("part-123")).thenReturn(Optional.of(partTestEntity));
+        when(partTestRepository.findByIdWithQuestions("part-123")).thenReturn(Optional.of(partTestEntity));
         when(partTestMapper.toPartTestResponse(partTestEntity)).thenReturn(detailResponse);
 
         PartTestDetailResponse result = partTestService.getPartTestById("part-123");
@@ -506,13 +506,13 @@ public class PartTestServiceImplTest {
         assertNotNull(result);
         assertEquals("part-123", result.getId());
         assertEquals("PART_1_TOEIC", result.getType());
-        verify(partTestRepository).findById("part-123");
+        verify(partTestRepository).findByIdWithQuestions("part-123");
         verify(partTestMapper).toPartTestResponse(partTestEntity);
     }
 
     @Test
     void getPartTestById_NotFound_ThrowsException() {
-        when(partTestRepository.findById("nonexistent")).thenReturn(Optional.empty());
+        when(partTestRepository.findByIdWithQuestions("nonexistent")).thenReturn(Optional.empty());
 
         AppException exception = assertThrows(AppException.class,
                 () -> partTestService.getPartTestById("nonexistent"));

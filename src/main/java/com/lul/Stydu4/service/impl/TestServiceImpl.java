@@ -22,10 +22,13 @@ import com.lul.Stydu4.repository.IPartTestRepository;
 import com.lul.Stydu4.repository.ITestRepository;
 import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.ITestService;
+import com.lul.Stydu4.util.SlugHelper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -64,6 +67,23 @@ public class TestServiceImpl implements ITestService {
         );
         entity.setType(testType);
 
+        if (request.getAudioId() != null && !request.getAudioId().isBlank()) {
+            // Tìm FileEntity từ audioId trong request
+            FileEntity audioFile = fileRepository.findById(request.getAudioId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FILE_NOT_FOUND)); // Ví dụ
+
+            // Gán file audio này cho test entity
+            entity.setAudio(audioFile);
+        }
+
+        // Auto-generate slug if not provided or empty
+        if (entity.getSlug() == null || entity.getSlug().trim().isEmpty()) {
+            entity.setSlug(SlugHelper.toUniqueSlug(entity.getName()));
+        } else {
+            // Normalize provided slug
+            entity.setSlug(SlugHelper.toSlug(entity.getSlug()));
+        }
+
         return testMapper.toTestResponse(testRepository.save(entity));
     }
 
@@ -81,6 +101,14 @@ public class TestServiceImpl implements ITestService {
         );
         entity.setType(testType);
 
+        // Auto-generate slug if not provided or empty
+        if (entity.getSlug() == null || entity.getSlug().trim().isEmpty()) {
+            entity.setSlug(SlugHelper.toUniqueSlug(entity.getName()));
+        } else {
+            // Normalize provided slug
+            entity.setSlug(SlugHelper.toSlug(entity.getSlug()));
+        }
+
         // Upload audio file if provided
         if (audio != null && !audio.isEmpty()) {
             FileEntity audioFile = fileStorageService.storeFile(audio, FileType.AUDIO, "tests");
@@ -94,7 +122,9 @@ public class TestServiceImpl implements ITestService {
 
     @Transactional
     @Override
+    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
     public TestDetailResponse update(String testId, TestUpdateRequest request) {
+        log.info("Updating test and invalidating cache: {}", testId);
         TestEntity existing = testRepository.findById(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
@@ -110,6 +140,20 @@ public class TestServiceImpl implements ITestService {
 
         // Cập nhật các trường đơn lẻ; null sẽ bị bỏ qua theo cấu hình mapper
         testMapper.updateTestEntityFromRequest(request, existing);
+
+        // Auto-update slug if slug is empty
+        if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
+            // Generate slug from new name if provided, otherwise use existing name
+            String nameToUse = (request.getName() != null && !request.getName().trim().isEmpty()) 
+                    ? request.getName() 
+                    : existing.getName();
+            if (nameToUse != null && !nameToUse.trim().isEmpty()) {
+                existing.setSlug(SlugHelper.toUniqueSlug(nameToUse));
+            }
+        } else {
+            // Normalize provided slug
+            existing.setSlug(SlugHelper.toSlug(request.getSlug()));
+        }
 
         // Ngữ nghĩa:
         // - partTestIds == null  -> KHÔNG thay đổi quan hệ parts
@@ -183,8 +227,11 @@ public class TestServiceImpl implements ITestService {
 
 
     @Override
+    @Cacheable(value = "test-details", key = "#testId")
     public TestDetailResponse getTestById(String testId) {
-        TestEntity test = testRepository.findById(testId)
+        log.debug("Cache miss - Loading test details from database: {}", testId);
+        // Use optimized query with EntityGraph to prevent N+1 problem
+        TestEntity test = testRepository.findByIdWithParts(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
         TestDetailResponse testDetailResponse = testMapper.toTestResponse(test);
@@ -195,7 +242,9 @@ public class TestServiceImpl implements ITestService {
     }
 
     @Override
+    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
     public void deleteTest(String testId) {
+        log.info("Deleting test and invalidating cache: {}", testId);
         testRepository.deleteById(testId);
     }
 

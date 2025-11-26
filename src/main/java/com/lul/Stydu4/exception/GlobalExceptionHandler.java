@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +38,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = AppException.class)
     ResponseEntity<ApiResponse> handlingAppException(AppException exception){
         ErrorCode errorCode = exception.getErrorCode();
+        log.error("AppException caught: code={}, message={}", errorCode.getCode(), errorCode.getMessage());
+        
         ApiResponse apiResponse = new ApiResponse();
 
         apiResponse.setCode(errorCode.getCode());
@@ -131,6 +134,39 @@ public class GlobalExceptionHandler {
         ApiResponse apiResponse = new ApiResponse();
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(detailedMessage);
+
+        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = RateLimitExceededException.class)
+    ResponseEntity<ApiResponse> handlingRateLimitExceeded(RateLimitExceededException exception){
+        log.warn("Rate limit exceeded: {}", exception.getMessage());
+        
+        ApiResponse apiResponse = new ApiResponse();
+        apiResponse.setCode(429);
+        apiResponse.setMessage(exception.getMessage());
+
+        return ResponseEntity.status(429).body(apiResponse);
+    }
+
+    @ExceptionHandler(value = AsyncRequestNotUsableException.class)
+    ResponseEntity<ApiResponse> handlingAsyncRequestNotUsable(AsyncRequestNotUsableException exception){
+        // This exception occurs when client closes connection before response is sent
+        // It's a normal behavior when user navigates away quickly
+        // Log at DEBUG level to avoid cluttering error logs
+        log.debug("Client closed connection before response was sent: {}", exception.getMessage());
+        
+        // Return null to indicate no response should be sent
+        return null;
+    }
+
+    @ExceptionHandler(value = Exception.class)
+    ResponseEntity<ApiResponse> handlingRuntimeException(Exception exception){
+        log.error("Uncaught exception: ", exception);
+        
+        ApiResponse apiResponse = new ApiResponse();
+        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
+        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage() + ": " + exception.getMessage());
 
         return ResponseEntity.badRequest().body(apiResponse);
     }

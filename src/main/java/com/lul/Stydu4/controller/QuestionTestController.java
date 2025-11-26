@@ -10,6 +10,7 @@ import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.Question.QuestionTestDetailResponse;
 
 import com.lul.Stydu4.dto.response.Question.QuestionTestSummaryResponse;
+import com.lul.Stydu4.enums.QuestionType;
 import com.lul.Stydu4.service.IQuestionTestService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -21,6 +22,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/question-tests")
@@ -48,17 +53,27 @@ public class QuestionTestController {
             @RequestPart(value = "audio", required = false) MultipartFile audio,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) throws Exception {
-        log.info("Creating question with files - audio: {}, image: {}",
+        log.info("=== Creating question with files ===");
+        log.info("Audio file: {}, size: {}", 
                 audio != null ? audio.getOriginalFilename() : "none",
-                image != null ? image.getOriginalFilename() : "none");
+                audio != null ? audio.getSize() : 0);
+        log.info("Image file: {}, size: {}", 
+                image != null ? image.getOriginalFilename() : "none",
+                image != null ? image.getSize() : 0);
+        log.info("Question data JSON: {}", questionDataJson);
 
         QuestionTestCreateRequest request = objectMapper.readValue(
                 questionDataJson,
                 QuestionTestCreateRequest.class
         );
 
+        log.info("Parsed request - Name: {}, Type: {}", request.getName(), request.getType());
+
         QuestionTestDetailResponse response = questionTestService
                 .createWithFiles(request, audio, image);
+
+        log.info("Question created successfully with ID: {}", response.getId());
+        log.info("Audio ID: {}, Image ID: {}", response.getAudioId(), response.getImageId());
 
         return ApiResponse.<QuestionTestDetailResponse>builder()
                 .result(response)
@@ -149,5 +164,27 @@ public class QuestionTestController {
         return ApiResponse.<QuestionTestDetailResponse>builder()
                 .result(response)
                 .build();
+    }
+
+    @GetMapping("/types")
+    ApiResponse<List<QuestionTypeDto>> getQuestionTypes() {
+        List<QuestionTypeDto> types = Arrays.stream(QuestionType.values())
+                .map(type -> new QuestionTypeDto(type.getType(), type.getName()))
+                .collect(Collectors.toList());
+
+        return ApiResponse.<List<QuestionTypeDto>>builder()
+                .result(types)
+                .build();
+    }
+
+    // Inner DTO class for question types
+    public static class QuestionTypeDto {
+        public String value;
+        public String label;
+
+        public QuestionTypeDto(String value, String label) {
+            this.value = value;
+            this.label = label;
+        }
     }
 }

@@ -12,7 +12,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table(name = "enrollments")
+@Table(name = "enrollments", 
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_user_course", columnNames = {"user_id", "course_id"})
+    },
+    indexes = {
+        @Index(name = "idx_enrollment_user_id", columnList = "user_id"),
+        @Index(name = "idx_enrollment_course_id", columnList = "course_id"),
+        @Index(name = "idx_enrollment_status", columnList = "status"),
+        @Index(name = "idx_enrollment_user_status", columnList = "user_id, status")
+    }
+)
 public class EnrollmentEntity extends BaseEntity {
 
     @Id

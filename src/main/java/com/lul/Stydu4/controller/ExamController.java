@@ -1,5 +1,6 @@
 package com.lul.Stydu4.controller;
 
+import com.lul.Stydu4.annotation.RateLimited;
 import com.lul.Stydu4.dto.request.Exam.SubmitExamRequest;
 import com.lul.Stydu4.dto.response.ApiResponse;
 import com.lul.Stydu4.dto.response.Exam.ExamQuestionsResponse;
@@ -69,6 +70,7 @@ public class ExamController {
      * }
      */
     @PostMapping("/submit")
+    @RateLimited(maxRequests = 3, timeWindowSeconds = 60, keyPrefix = "exam_submit")
     public ApiResponse<ExamResultResponse> submitExam(
             @RequestBody @Valid SubmitExamRequest request
     ) {
@@ -119,6 +121,24 @@ public class ExamController {
 
         return ApiResponse.<List<ExamResultResponse>>builder()
                 .result(examService.getUserExamResults(testId, userName))
+                .build();
+    }
+
+    /**
+     * Get All Exam Results for Current User (across all tests)
+     * GET /exams/my-results
+     *
+     * Example: GET /exams/my-results
+     */
+    @GetMapping("/my-results")
+    public ApiResponse<List<ExamResultResponse>> getAllUserExamResults() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userName = authentication.getName();
+
+        log.info("Fetching all exam results for user: {}", userName);
+
+        return ApiResponse.<List<ExamResultResponse>>builder()
+                .result(examService.getAllUserExamResults(userName))
                 .build();
     }
 }

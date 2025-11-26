@@ -1,11 +1,14 @@
 package com.lul.Stydu4.dto.request.Question;
 
 
+import com.lul.Stydu4.dto.request.Answer.AnswerCreateRequest;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -26,7 +29,10 @@ public class QuestionTestUpdateRequest {
 
     private String questionGroupId;
     private String partId;
-    private List<String> answerIds;
-
+    
+    // ✅ Changed: Support updating answers with full data
+    @Valid
+    @Builder.Default
+    private List<AnswerCreateRequest> answers = new ArrayList<>();
 
 }

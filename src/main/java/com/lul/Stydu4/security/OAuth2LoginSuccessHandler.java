@@ -35,7 +35,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private String frontendUrl;
 
     @Override
-    @Transactional  // ✅ Thêm @Transactional để tránh LazyInitializationException
+    @Transactional  // Thêm @Transactional để tránh LazyInitializationException
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
@@ -59,13 +59,14 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 }
             });
 
-            // Generate JWT token
-            String jwtToken = authenticationService.generateTokenForOAuth2User(user);
+            // Generate JWT tokens (access token + refresh token)
+            var authResponse = authenticationService.generateTokenForOAuth2User(user);
 
-            // Redirect về frontend với token
+            // Redirect về frontend với cả 2 tokens
             String redirectUrl = UriComponentsBuilder
-                    .fromUriString(frontendUrl + "/Stydu4/oauth2-callback.html")
-                    .queryParam("token", jwtToken)
+                    .fromUriString(frontendUrl + "/login")
+                    .queryParam("token", authResponse.getToken())
+                    .queryParam("refreshToken", authResponse.getRefreshToken())
                     .build()
                     .toUriString();
 
@@ -75,9 +76,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         } catch (Exception e) {
             log.error("Error during OAuth2 authentication", e);
 
-            // ✅ Fix: Redirect về frontend với error (không duplicate query param)
+            // Redirect về frontend với error
             String errorUrl = UriComponentsBuilder
-                    .fromUriString(frontendUrl + "/Stydu4/oauth2-callback.html")
+                    .fromUriString(frontendUrl + "/login")
                     .queryParam("error", "authentication_failed")
                     .queryParam("message", e.getMessage())
                     .build()

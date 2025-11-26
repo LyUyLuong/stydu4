@@ -10,4 +10,6 @@ import java.util.List;
 public interface IResultRepository extends JpaRepository <ResultEntity, String>{
 
     List<ResultEntity> findByTestIdAndUserUsernameOrderByCreatedDateDesc(String testId, String userName);
+    
+    List<ResultEntity> findByUserUsernameOrderByCreatedDateDesc(String userName);
 }

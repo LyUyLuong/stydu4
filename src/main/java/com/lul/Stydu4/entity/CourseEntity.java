@@ -12,7 +12,11 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Builder
-@Table(name = "courses")
+@Table(name = "courses", indexes = {
+    @Index(name = "idx_course_published", columnList = "isPublished"),
+    @Index(name = "idx_course_price", columnList = "price"),
+    @Index(name = "idx_course_published_price", columnList = "isPublished, price")
+})
 public class CourseEntity extends BaseEntity {
 
     @Id
@@ -45,4 +49,7 @@ public class CourseEntity extends BaseEntity {
 
     @OneToMany(mappedBy = "course")
     private List<EnrollmentEntity> enrollments;
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<LectureEntity> lectures;
 }

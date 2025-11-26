@@ -40,6 +40,15 @@ public class SecurityConfig {
             "/auth/logout",
             "/auth/refresh",
     };
+    
+    private final String[] PUBLIC_GET_ENDPOINTS = {
+            "/tests/**",
+            "/part-tests/**",
+            "/files/**",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
 
     private final CustomJwtDecoder jwtDecoder;
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
@@ -54,15 +63,14 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http.authorizeHttpRequests(request ->
-                request.requestMatchers(HttpMethod.POST,PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/oauth2/**"
-                        ).permitAll()
-                        .requestMatchers("/api/v1/files/**").permitAll()
+                request
+                        // Public POST endpoints (registration, login, etc.)
+                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+                        // Public GET endpoints (view tests, files, documentation)
+                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
+                        // OAuth2 endpoints
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        // All other requests require authentication
                         .anyRequest().authenticated()
         );
         http.csrf(AbstractHttpConfigurer::disable);
@@ -75,9 +83,17 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
-        // Cấu hình OAuth2 Login
         http.oauth2Login(oauth2 -> oauth2
                 .successHandler(oauth2LoginSuccessHandler)
+                .loginPage("/oauth2/authorization/google")
+                .permitAll()
+        )
+        // Tắt form login và HTTP Basic để tránh auto-redirect
+        .formLogin(AbstractHttpConfigurer::disable)
+        .httpBasic(AbstractHttpConfigurer::disable)
+        // Tắt exception handling mặc định để không redirect sang login
+        .exceptionHandling(exception -> exception
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
         );
 
         return http.build();

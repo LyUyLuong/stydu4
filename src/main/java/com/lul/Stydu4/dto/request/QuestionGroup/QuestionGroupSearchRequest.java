@@ -21,6 +21,9 @@ public class QuestionGroupSearchRequest {
     private String type;
 
     private String partName;
+    
+    // ✅ Add support for filtering by Part ID
+    private String partId;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) // Format: yyyy-MM-dd
     private LocalDate createdFrom;

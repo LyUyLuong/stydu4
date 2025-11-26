@@ -274,16 +274,19 @@ class AuthenticationServiceImplTest {
         @DisplayName("Should generate valid JWT token for OAuth2 user")
         void generateTokenForOAuth2User_ValidUser_Success() throws ParseException {
             // WHEN
-            String token = authenticationService.generateTokenForOAuth2User(oauth2User);
+            AuthenticationResponse response = authenticationService.generateTokenForOAuth2User(oauth2User);
 
             // THEN
-            assertThat(token).isNotNull();
-            assertThat(token).startsWith("eyJ");
+            assertThat(response).isNotNull();
+            assertThat(response.getToken()).isNotNull();
+            assertThat(response.getToken()).startsWith("eyJ");
+            assertThat(response.getRefreshToken()).isNotNull();
+            assertThat(response.isAuthenticated()).isTrue();
 
             // Parse and verify OAuth2 specific claims
-            SignedJWT signedJWT = SignedJWT.parse(token);
+            SignedJWT signedJWT = SignedJWT.parse(response.getToken());
             assertThat(signedJWT.getJWTClaimsSet().getSubject()).isEqualTo("jane_doe@gmail.com");
-            assertThat(signedJWT.getJWTClaimsSet().getIssuer()).isEqualTo("stydu4.com");
+            assertThat(signedJWT.getJWTClaimsSet().getIssuer()).isEqualTo("Stydu4");
             assertThat(signedJWT.getJWTClaimsSet().getStringClaim("userId")).isEqualTo("user-456");
             assertThat(signedJWT.getJWTClaimsSet().getStringClaim("authProvider")).isEqualTo("GOOGLE");
             assertThat(signedJWT.getJWTClaimsSet().getClaim("scope")).isNotNull();
@@ -293,10 +296,10 @@ class AuthenticationServiceImplTest {
         @DisplayName("Should include correct authProvider in token")
         void generateTokenForOAuth2User_IncludesAuthProvider_Success() throws ParseException {
             // WHEN
-            String token = authenticationService.generateTokenForOAuth2User(oauth2User);
+            AuthenticationResponse response = authenticationService.generateTokenForOAuth2User(oauth2User);
 
             // THEN
-            SignedJWT signedJWT = SignedJWT.parse(token);
+            SignedJWT signedJWT = SignedJWT.parse(response.getToken());
             assertThat(signedJWT.getJWTClaimsSet().getStringClaim("authProvider")).isEqualTo("GOOGLE");
         }
     }

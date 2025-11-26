@@ -19,6 +19,6 @@ public interface IAuthenticationService {
     void logout(LogoutRequest request) throws ParseException, JOSEException;
     AuthenticationResponse refreshToken(RefreshTokenRequest request) throws ParseException, JOSEException;
 
-    String generateTokenForOAuth2User(UserEntity user);
+    AuthenticationResponse generateTokenForOAuth2User(UserEntity user);
 
 }

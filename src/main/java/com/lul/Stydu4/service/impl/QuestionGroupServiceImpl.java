@@ -143,17 +143,25 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     ) {
         log.info("Searching question groups with criteria: {}", request);
 
+        // ✅ Build custom Pageable from request params (same as QuestionTestServiceImpl)
+        int idx = Math.max(0, request.getPage() - 1);
+        int size = Math.min(request.getSize(), 100);
+        Pageable pg = PageRequest.of(idx, size, pageable.getSort());
+
         Specification<QuestionGroupEntity> spec = QuestionGroupSpecification.buildSpecification(request);
-        Page<QuestionGroupEntity> questionGroupPage = questionGroupRepository.findAll(spec, pageable);
+        Page<QuestionGroupEntity> questionGroupPage = questionGroupRepository.findAll(spec, pg);
 
         List<QuestionGroupSummaryResponse> responses = questionGroupPage.getContent()
                 .stream()
                 .map(questionGroupMapper::toQuestionGroupSummaryResponse)
                 .toList();
 
+        log.info("searchQuestionGroups found {} groups, page={}, size={}, total={}",
+                responses.size(), idx + 1, size, questionGroupPage.getTotalElements());
+
         return PageResponse.<QuestionGroupSummaryResponse>builder()
-                .currentPage(pageable.getPageNumber() + 1)
-                .pageSize(questionGroupPage.getSize())
+                .currentPage(idx + 1)
+                .pageSize(size)
                 .totalPages(questionGroupPage.getTotalPages())
                 .totalElements(questionGroupPage.getTotalElements())
                 .data(responses)
@@ -165,7 +173,8 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     public QuestionGroupDetailResponse getQuestionGroupById(String questionGroupId) {
         log.info("Fetching question group with id: {}", questionGroupId);
 
-        QuestionGroupEntity questionGroup = questionGroupRepository.findById(questionGroupId)
+        // ✅ Use optimized query to prevent N+1 problem
+        QuestionGroupEntity questionGroup = questionGroupRepository.findByIdWithDetails(questionGroupId)
                 .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
 
         return questionGroupMapper.toQuestionGroupDetailResponse(questionGroup);

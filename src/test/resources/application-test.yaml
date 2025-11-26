@@ -1,0 +1,47 @@
+server:
+  port: 8081 # Port cho môi trường test
+
+spring:
+  # === Cấu hình H2 Database ===
+  datasource:
+    url: jdbc:h2:mem:testdb  # Sử dụng H2 in-memory (database tên là testdb)
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect # Chỉ định H2 Dialect
+    hibernate:
+      ddl-auto: create-drop # Tạo CSDL khi bắt đầu test và xóa đi khi test xong
+    properties:
+      format_sql: true
+    show-sql: false # Thường không cần show SQL khi chạy test
+
+  # Bật H2 Console để xem CSDL (truy cập: http://localhost:8081/h2-console)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # === Mail Configuration for Tests ===
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+
+# === JWT Configuration for Tests ===
+jwt:
+  signerKey: "test-signer-key-for-unit-tests-only-do-not-use-in-production-minimum-32-characters-required"
+  valid-duration: 3600  # 1 hour
+  refreshable-duration: 86400  # 24 hours
+
+# === Stripe Configuration for Tests ===
+stripe:
+  api-key: "sk_test_dummy_key_for_unit_tests_only"
+  webhook-secret: "whsec_test_dummy_webhook_secret_for_unit_tests_only"
+
+# === Email Configuration for Tests ===
+email:
+  from: "test@example.com"
+  enabled: false  # Disable email sending in tests

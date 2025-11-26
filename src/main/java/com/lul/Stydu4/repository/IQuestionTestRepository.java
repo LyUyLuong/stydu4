@@ -23,4 +23,8 @@ public interface IQuestionTestRepository extends JpaRepository<QuestionTestEntit
     @EntityGraph(attributePaths = {"audio", "image"})
     @Override
     java.util.List<QuestionTestEntity> findAll();
+
+    @EntityGraph(attributePaths = {"audio", "image", "answers"})
+    @Override
+    java.util.Optional<QuestionTestEntity> findById(String id);
 }

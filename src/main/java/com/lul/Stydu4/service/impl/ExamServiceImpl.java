@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -88,6 +88,15 @@ public class ExamServiceImpl implements IExamService {
             throw new AppException(ErrorCode.PART_TEST_NOT_FOUND);
         }
 
+        // Sort parts by part number extracted from name (e.g., "Part 1", "Part 2")
+        parts = parts.stream()
+                .sorted((p1, p2) -> {
+                    int num1 = extractPartNumber(p1.getName());
+                    int num2 = extractPartNumber(p2.getName());
+                    return Integer.compare(num1, num2);
+                })
+                .collect(Collectors.toList());
+
         List<PartQuestionsDetail> partDetails = parts.stream()
                 .map(this::mapPartToDetail)
                 .collect(Collectors.toList());
@@ -114,7 +123,22 @@ public class ExamServiceImpl implements IExamService {
     public ExamResultResponse submitExam(SubmitExamRequest request, String userName) {
         log.info("=== STARTING EXAM SUBMISSION ===");
         log.info("User: {}, Test: {}, Parts: {}", userName, request.getTestId(), request.getPartIds());
-        LocalDateTime startTime = LocalDateTime.now();
+
+        // Validate start time
+        Instant startedAt = request.getStartedAt();
+        Instant now = Instant.now();
+
+        if (startedAt == null) {
+            log.error("Start time is required but was null");
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        if (startedAt.isAfter(now)) {
+            log.error("Start time {} is in the future (now: {})", startedAt, now);
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+
+        log.info("Exam started at: {}, submitting at: {}", startedAt, now);
 
         // 1. Load and validate exam context
         ExamContext context = loadExamContext(request, userName);
@@ -131,10 +155,20 @@ public class ExamServiceImpl implements IExamService {
         );
 
         // 5. Calculate scores
-        ExamScores scores = calculateScores(processingResult, context.isFullTest());
+        ExamScores scores = calculateScores(processingResult, context);
 
-        // 6. Update and save results
-        Duration duration = Duration.between(startTime, LocalDateTime.now());
+        // 6. Calculate actual exam duration
+        // ✅ NEW: Prioritize duration from frontend (more accurate, accounts for client-side time)
+        // If frontend provides durationSeconds, use it; otherwise calculate from startedAt to now
+        Duration duration;
+        if (request.getDurationSeconds() != null && request.getDurationSeconds() > 0) {
+            duration = Duration.ofSeconds(request.getDurationSeconds());
+            log.info("Using duration from frontend: {} seconds", duration.toSeconds());
+        } else {
+            duration = Duration.between(startedAt, now);
+            log.info("Calculated duration from server timestamps: {} seconds (startedAt: {}, now: {})", 
+                    duration.toSeconds(), startedAt, now);
+        }
         updateAndSaveResults(savedResult, processingResult, scores, duration);
 
         // 7. Save part results
@@ -163,22 +197,25 @@ public class ExamServiceImpl implements IExamService {
         }
 
         List<UserAnswerEntity> userAnswers = userAnswerRepository.findByResultId(resultId);
-        List<QuestionResultDetail> questionResults = mapToQuestionResults(userAnswers);
+        
+        // Get all questions from completed parts and map with user answers
+        List<QuestionResultDetail> questionResults = mapToAllQuestionResults(result, userAnswers);
+        
         List<PartResultDetail> partResults = mapToPartResults(result.getResultHaveParts());
         List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
 
         Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
-        Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
 
         return ExamResultResponse.builder()
                 .resultId(result.getId())
                 .testId(result.getTest().getId())
                 .testName(result.getTest().getName())
+                .testType(result.getTest().getType().name())
                 .userId(result.getUser().getId())
                 .userName(result.getUser().getUsername())
                 .isFullTest(result.getIsFullTest())
                 .completedPartIds(completedPartIds)
-                .totalScore(totalScore)
+                .totalScore(result.getTotalPoint())
                 .listeningScore(result.getListeningPoint())
                 .readingScore(result.getReadingPoint())
                 .totalCorrectAnswers(totalCorrect)
@@ -212,6 +249,22 @@ public class ExamServiceImpl implements IExamService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExamResultResponse> getAllUserExamResults(String userName) {
+        log.info("Fetching all exam results for user: {}", userName);
+
+        UserEntity user = userRepository.findByUsername(userName)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        List<ResultEntity> results = resultRepository
+                .findByUserUsernameOrderByCreatedDateDesc(userName);
+
+        return results.stream()
+                .map(this::mapToExamResultResponse)
+                .collect(Collectors.toList());
+    }
+
     // =============== PRIVATE HELPER METHODS ===============
 
     // ✅ NEW - Build file URL helper
@@ -221,12 +274,38 @@ public class ExamServiceImpl implements IExamService {
     }
 
     private PartQuestionsDetail mapPartToDetail(PartTestEntity part) {
+        // Sort questions by question number extracted from name
         List<QuestionTestDetailResponse> questions = part.getQuestions().stream()
+                .sorted((q1, q2) -> {
+                    int num1 = extractQuestionNumber(q1.getName());
+                    int num2 = extractQuestionNumber(q2.getName());
+                    return Integer.compare(num1, num2);
+                })
                 .map(questionTestMapper::toQuestionDetailResponse)
                 .collect(Collectors.toList());
 
+        // Sort question groups by group number and their internal questions
         List<QuestionGroupDetailResponse> questionGroups = part.getQuestionGroups().stream()
-                .map(questionGroupMapper::toQuestionGroupDetailResponse)
+                .sorted((qg1, qg2) -> {
+                    int num1 = extractQuestionNumber(qg1.getName());
+                    int num2 = extractQuestionNumber(qg2.getName());
+                    return Integer.compare(num1, num2);
+                })
+                .map(qg -> {
+                    QuestionGroupDetailResponse response = questionGroupMapper.toQuestionGroupDetailResponse(qg);
+                    // Sort questions within the question group
+                    if (response.getQuestions() != null && !response.getQuestions().isEmpty()) {
+                        List<QuestionTestDetailResponse> sortedGroupQuestions = response.getQuestions().stream()
+                                .sorted((q1, q2) -> {
+                                    int num1 = extractQuestionNumber(q1.getName());
+                                    int num2 = extractQuestionNumber(q2.getName());
+                                    return Integer.compare(num1, num2);
+                                })
+                                .collect(Collectors.toList());
+                        response.setQuestions(sortedGroupQuestions);
+                    }
+                    return response;
+                })
                 .collect(Collectors.toList());
 
         return PartQuestionsDetail.builder()
@@ -237,6 +316,54 @@ public class ExamServiceImpl implements IExamService {
                 .questions(questions)
                 .questionGroups(questionGroups)
                 .build();
+    }
+
+    /**
+     * Extract question number from question name
+     * Example: "Question 6 - Part 1" -> 6
+     * Example: "Question Group 68 - 70 - Part 3" -> 68
+     */
+    private int extractQuestionNumber(String name) {
+        if (name == null) {
+            return Integer.MAX_VALUE; // Put null names at the end
+        }
+        
+        // Pattern matches "Question 123" or "Question Group 123"
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "question\\s+(?:group\\s+)?(\\d+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(name);
+        
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        
+        return Integer.MAX_VALUE; // Put unparseable names at the end
+    }
+
+    /**
+     * Extract part number from part name
+     * Example: "Part 1 for Test 1" -> 1
+     * Example: "Part 3" -> 3
+     */
+    private int extractPartNumber(String name) {
+        if (name == null) {
+            return Integer.MAX_VALUE; // Put null names at the end
+        }
+        
+        // Pattern matches "Part 1" or "Part 7"
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "part\\s+(\\d+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(name);
+        
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        
+        return Integer.MAX_VALUE; // Put unparseable names at the end
     }
 
     private Integer calculateTotalQuestions(List<PartTestEntity> parts) {
@@ -359,7 +486,10 @@ public class ExamServiceImpl implements IExamService {
                 );
 
                 questionResults.add(data.getQuestionResult());
-                userAnswerEntities.add(data.getUserAnswer());
+                // Only save user answer if they actually answered the question
+                if (data.getUserAnswer().getAnswer() != null) {
+                    userAnswerEntities.add(data.getUserAnswer());
+                }
                 partResult.incrementTotal();
 
                 if (data.isCorrect()) {
@@ -387,7 +517,10 @@ public class ExamServiceImpl implements IExamService {
                     );
 
                     questionResults.add(data.getQuestionResult());
-                    userAnswerEntities.add(data.getUserAnswer());
+                    // Only save user answer if they actually answered the question
+                    if (data.getUserAnswer().getAnswer() != null) {
+                        userAnswerEntities.add(data.getUserAnswer());
+                    }
                     partResult.incrementTotal();
 
                     if (data.isCorrect()) {
@@ -460,28 +593,75 @@ public class ExamServiceImpl implements IExamService {
         return new ProcessedQuestionData(userAnswerEntity, questionResult, isCorrect);
     }
 
-    private ExamScores calculateScores(ExamProcessingResult result, boolean isFullTest) {
+    private ExamScores calculateScores(ExamProcessingResult result, ExamContext context) {
         int listeningScore = 0;
         int readingScore = 0;
 
-        if (isFullTest) {
-            listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
-            readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
-        } else {
+        // Check if this is an IELTS test
+        boolean isIeltsTest = context.getTest().getType().getType().equals("IELTS");
+
+        if (isIeltsTest) {
+            // IELTS scoring - convert raw scores to band scores (0-9 scale)
             if (result.getListeningTotal() > 0) {
-                listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                listeningScore = convertToIeltsBandScore(result.getListeningCorrect(), result.getListeningTotal());
             }
             if (result.getReadingTotal() > 0) {
-                readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+                readingScore = convertToIeltsBandScore(result.getReadingCorrect(), result.getReadingTotal());
             }
+
+            log.info("=== IELTS BAND SCORES ===");
+            log.info("Listening: {}/{} correct -> Band {}", result.getListeningCorrect(), result.getListeningTotal(), formatIeltsBandScore(listeningScore));
+            log.info("Reading: {}/{} correct -> Band {}", result.getReadingCorrect(), result.getReadingTotal(), formatIeltsBandScore(readingScore));
+        } else {
+            // TOEIC scoring - convert to 5-495 scale
+            if (context.isFullTest()) {
+                listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+            } else {
+                if (result.getListeningTotal() > 0) {
+                    listeningScore = convertToToeicScore(result.getListeningCorrect(), result.getListeningTotal());
+                }
+                if (result.getReadingTotal() > 0) {
+                    readingScore = convertToToeicScore(result.getReadingCorrect(), result.getReadingTotal());
+                }
+            }
+
+            log.info("=== TOEIC SCORES ===");
+            log.info("Listening Score: {}", listeningScore);
+            log.info("Reading Score: {}", readingScore);
         }
 
-        int totalScore = listeningScore + readingScore;
+        int totalScore;
+        if (isIeltsTest) {
+            // IELTS: Overall band score is the AVERAGE of all components, rounded to nearest 0.5
+            // Since scores are stored as int * 10, we calculate average and round
+            int sectionsCompleted = 0;
+            int sumScores = 0;
 
-        log.info("=== SCORES ===");
-        log.info("Listening Score: {}", listeningScore);
-        log.info("Reading Score: {}", readingScore);
-        log.info("Total Score: {}", totalScore);
+            if (result.getListeningTotal() > 0) {
+                sumScores += listeningScore;
+                sectionsCompleted++;
+            }
+            if (result.getReadingTotal() > 0) {
+                sumScores += readingScore;
+                sectionsCompleted++;
+            }
+
+            if (sectionsCompleted > 0) {
+                // Calculate average (still in int * 10 format)
+                double averageScore = (double) sumScores / sectionsCompleted;
+                // Round to nearest 0.5 (nearest 5 in int * 10 format)
+                totalScore = (int) (Math.round(averageScore / 5.0) * 5);
+            } else {
+                totalScore = 0;
+            }
+
+            log.info("Overall Band Score: {} (average of {} sections)", formatIeltsBandScore(totalScore), sectionsCompleted);
+        } else {
+            // TOEIC: Total is sum
+            totalScore = listeningScore + readingScore;
+            log.info("Total Score: {}", totalScore);
+        }
 
         return new ExamScores(listeningScore, readingScore, totalScore);
     }
@@ -494,6 +674,7 @@ public class ExamServiceImpl implements IExamService {
     ) {
         result.setReadingPoint(scores.getReadingScore());
         result.setListeningPoint(scores.getListeningScore());
+        result.setTotalPoint(scores.getTotalScore());
         result.setReadingCorrectAnswer(processingResult.getReadingCorrect());
         result.setListeningCorrectAnswer(processingResult.getListeningCorrect());
         result.setCompleteTime(duration);
@@ -544,6 +725,7 @@ public class ExamServiceImpl implements IExamService {
                 .resultId(savedResult.getId())
                 .testId(context.getTest().getId())
                 .testName(context.getTest().getName())
+                .testType(context.getTest().getType().name())
                 .userId(context.getUser().getId())
                 .userName(context.getUser().getUsername())
                 .isFullTest(context.isFullTest())
@@ -563,6 +745,85 @@ public class ExamServiceImpl implements IExamService {
                 .build();
     }
 
+    /**
+     * Map all questions from completed parts with user answers
+     * Shows all questions including unanswered ones
+     */
+    private List<QuestionResultDetail> mapToAllQuestionResults(ResultEntity result, List<UserAnswerEntity> userAnswers) {
+        // Create a map of user answers by question ID for quick lookup
+        Map<String, UserAnswerEntity> userAnswerMap = userAnswers.stream()
+                .collect(Collectors.toMap(
+                        ua -> ua.getQuestion().getId(),
+                        ua -> ua,
+                        (existing, replacement) -> existing // In case of duplicates, keep existing
+                ));
+
+        // Get all parts that were completed
+        List<PartTestEntity> completedParts = result.getResultHaveParts().stream()
+                .map(ResultHavePartsEntity::getPartTest)
+                .collect(Collectors.toList());
+
+        // Get all questions from completed parts
+        List<QuestionTestEntity> allQuestions = new ArrayList<>();
+        for (PartTestEntity part : completedParts) {
+            // Get direct questions in part
+            if (part.getQuestions() != null) {
+                allQuestions.addAll(part.getQuestions());
+            }
+            
+            // Get questions from question groups in part
+            if (part.getQuestionGroups() != null) {
+                for (QuestionGroupEntity group : part.getQuestionGroups()) {
+                    if (group.getQuestions() != null) {
+                        allQuestions.addAll(group.getQuestions());
+                    }
+                }
+            }
+        }
+
+        // Map all questions to QuestionResultDetail
+        return allQuestions.stream()
+                .map(question -> {
+                    UserAnswerEntity userAnswer = userAnswerMap.get(question.getId());
+                    AnswerEntity correctAnswer = question.getAnswers().stream()
+                            .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
+                            .findFirst()
+                            .orElse(null);
+
+                    // Map all answers for this question
+                    List<QuestionResultDetail.AnswerDetail> allAnswers = question.getAnswers().stream()
+                            .map(answer -> QuestionResultDetail.AnswerDetail.builder()
+                                    .answerId(answer.getId())
+                                    .mark(answer.getMark())
+                                    .content(answer.getContent())
+                                    .isCorrect(Boolean.TRUE.equals(answer.getIsCorrect()))
+                                    .build())
+                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                            .collect(Collectors.toList());
+
+                    return QuestionResultDetail.builder()
+                            .questionId(question.getId())
+                            .questionContent(question.getContent())
+                            .audioId(question.getAudio() != null ? question.getAudio().getId() : null)
+                            .audioUrl(question.getAudio() != null ? buildFileUrl(question.getAudio().getId()) : null)
+                            .imageId(question.getImage() != null ? question.getImage().getId() : null)
+                            .imageUrl(question.getImage() != null ? buildFileUrl(question.getImage().getId()) : null)
+                            .userAnswerId(userAnswer != null ? userAnswer.getAnswer().getId() : null)
+                            .userAnswerContent(userAnswer != null ? userAnswer.getAnswer().getContent() : null)
+                            .correctAnswerId(correctAnswer != null ? correctAnswer.getId() : null)
+                            .correctAnswerContent(correctAnswer != null ? correctAnswer.getContent() : null)
+                            .isCorrect(userAnswer != null ? userAnswer.getIsCorrect() : false)
+                            .partName(question.getPartEntity() != null ?
+                                    question.getPartEntity().getName() : 
+                                    (question.getQuestionGroupEntity() != null && question.getQuestionGroupEntity().getPartEntity() != null ?
+                                            question.getQuestionGroupEntity().getPartEntity().getName() : ""))
+                            .allAnswers(allAnswers)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
     private List<QuestionResultDetail> mapToQuestionResults(List<UserAnswerEntity> userAnswers) {
         return userAnswers.stream()
                 .map(ua -> {
@@ -572,6 +833,18 @@ public class ExamServiceImpl implements IExamService {
                             .filter(answer -> Boolean.TRUE.equals(answer.getIsCorrect()))
                             .findFirst()
                             .orElse(null);
+
+                    // Map all answers for this question
+                    List<QuestionResultDetail.AnswerDetail> allAnswers = question.getAnswers().stream()
+                            .map(answer -> QuestionResultDetail.AnswerDetail.builder()
+                                    .answerId(answer.getId())
+                                    .mark(answer.getMark())
+                                    .content(answer.getContent())
+                                    .isCorrect(Boolean.TRUE.equals(answer.getIsCorrect()))
+                                    .build())
+                            .sorted(Comparator.comparing(QuestionResultDetail.AnswerDetail::getMark,
+                                    Comparator.nullsLast(Comparator.naturalOrder())))
+                            .collect(Collectors.toList());
 
                     return QuestionResultDetail.builder()
                             .questionId(question.getId())
@@ -589,6 +862,7 @@ public class ExamServiceImpl implements IExamService {
                             .isCorrect(ua.getIsCorrect())
                             .partName(question.getPartEntity() != null ?
                                     question.getPartEntity().getName() : "")
+                            .allAnswers(allAnswers)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -618,17 +892,17 @@ public class ExamServiceImpl implements IExamService {
         List<String> completedPartIds = extractCompletedPartIds(result.getResultHaveParts());
 
         Integer totalCorrect = result.getListeningCorrectAnswer() + result.getReadingCorrectAnswer();
-        Integer totalScore = result.getListeningPoint() + result.getReadingPoint();
 
         return ExamResultResponse.builder()
                 .resultId(result.getId())
                 .testId(result.getTest().getId())
                 .testName(result.getTest().getName())
+                .testType(result.getTest().getType().name())
                 .userId(result.getUser().getId())
                 .userName(result.getUser().getUsername())
                 .isFullTest(result.getIsFullTest())
                 .completedPartIds(completedPartIds)
-                .totalScore(totalScore)
+                .totalScore(result.getTotalPoint())
                 .listeningScore(result.getListeningPoint())
                 .readingScore(result.getReadingPoint())
                 .totalCorrectAnswers(totalCorrect)
@@ -644,10 +918,19 @@ public class ExamServiceImpl implements IExamService {
     }
 
     private static boolean isListeningPart(PartType partType) {
-        return partType == PartType.PART_1_TOEIC ||
+        // TOEIC Listening Parts
+        boolean isToeicListening = partType == PartType.PART_1_TOEIC ||
                 partType == PartType.PART_2_TOEIC ||
                 partType == PartType.PART_3_TOEIC ||
                 partType == PartType.PART_4_TOEIC;
+
+        // IELTS Listening Sections
+        boolean isIeltsListening = partType == PartType.LISTENING_SECTION_1_IELTS ||
+                partType == PartType.LISTENING_SECTION_2_IELTS ||
+                partType == PartType.LISTENING_SECTION_3_IELTS ||
+                partType == PartType.LISTENING_SECTION_4_IELTS;
+
+        return isToeicListening || isIeltsListening;
     }
 
     private Integer convertToToeicScore(int correctAnswers, int totalQuestions) {
@@ -662,6 +945,95 @@ public class ExamServiceImpl implements IExamService {
         if (scaledScore > 495) scaledScore = 495;
 
         return scaledScore;
+    }
+
+    /**
+     * Convert raw IELTS score to band score (stored as integer * 10)
+     * For example: Band 6.5 is stored as 65, Band 7.0 is stored as 70
+     * This allows us to store band scores as integers while preserving the 0.5 increments
+     *
+     * @param correctAnswers Number of correct answers
+     * @param totalQuestions Total number of questions in the test
+     * @return Band score as integer * 10 (e.g., 65 for band 6.5)
+     */
+    private Integer convertToIeltsBandScore(int correctAnswers, int totalQuestions) {
+        // Handle edge cases
+        if (correctAnswers < 0) correctAnswers = 0;
+        if (totalQuestions <= 0) return 0;
+        if (correctAnswers > totalQuestions) correctAnswers = totalQuestions;
+
+        // If test has fewer than 40 questions, scale to 40 for conversion
+        // Example: 3/4 correct = 75% = 30/40 for conversion table
+        int scaledCorrectAnswers;
+        if (totalQuestions < 40) {
+            double percentage = (double) correctAnswers / totalQuestions;
+            scaledCorrectAnswers = (int) Math.round(percentage * 40);
+            log.debug("Scaled {}/{} questions to {}/40 for IELTS conversion",
+                correctAnswers, totalQuestions, scaledCorrectAnswers);
+        } else {
+            scaledCorrectAnswers = correctAnswers;
+        }
+
+        // IELTS Listening/Reading conversion table (40 questions max)
+        // Band scores: 0.0 to 9.0 in 0.5 increments
+        if (scaledCorrectAnswers < 0) scaledCorrectAnswers = 0;
+        if (scaledCorrectAnswers > 40) scaledCorrectAnswers = 40;
+
+        // Conversion table based on official IELTS scoring
+        int[] bandScores = {
+            0,   // 0 correct = 0.0 band
+            0,   // 1 correct = 0.0 band
+            0,   // 2 correct = 0.0 band
+            0,   // 3 correct = 0.0 band
+            10,  // 4 correct = 1.0 band
+            20,  // 5 correct = 2.0 band
+            25,  // 6 correct = 2.5 band
+            30,  // 7 correct = 3.0 band
+            30,  // 8 correct = 3.0 band
+            35,  // 9 correct = 3.5 band
+            40,  // 10 correct = 4.0 band
+            40,  // 11 correct = 4.0 band
+            40,  // 12 correct = 4.0 band
+            45,  // 13 correct = 4.5 band
+            45,  // 14 correct = 4.5 band
+            50,  // 15 correct = 5.0 band
+            50,  // 16 correct = 5.0 band
+            50,  // 17 correct = 5.0 band
+            55,  // 18 correct = 5.5 band
+            55,  // 19 correct = 5.5 band
+            60,  // 20 correct = 6.0 band
+            60,  // 21 correct = 6.0 band
+            60,  // 22 correct = 6.0 band
+            65,  // 23 correct = 6.5 band
+            65,  // 24 correct = 6.5 band
+            65,  // 25 correct = 6.5 band
+            70,  // 26 correct = 7.0 band
+            70,  // 27 correct = 7.0 band
+            70,  // 28 correct = 7.0 band
+            70,  // 29 correct = 7.0 band
+            75,  // 30 correct = 7.5 band
+            75,  // 31 correct = 7.5 band
+            80,  // 32 correct = 8.0 band
+            80,  // 33 correct = 8.0 band
+            80,  // 34 correct = 8.0 band
+            85,  // 35 correct = 8.5 band
+            85,  // 36 correct = 8.5 band
+            85,  // 37 correct = 8.5 band
+            90,  // 38 correct = 9.0 band
+            90,  // 39 correct = 9.0 band
+            90   // 40 correct = 9.0 band
+        };
+
+        return bandScores[scaledCorrectAnswers];
+    }
+
+    /**
+     * Format IELTS band score for display
+     * Converts stored integer (e.g., 65) to band score string (e.g., "6.5")
+     */
+    private String formatIeltsBandScore(int bandScoreInt) {
+        double bandScore = bandScoreInt / 10.0;
+        return String.format("%.1f", bandScore);
     }
 
     private String formatDuration(Object completeTime) {

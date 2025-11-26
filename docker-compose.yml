@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: stydu4-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: db_stydu4
+      MYSQL_USER: stydu4_user
+      MYSQL_PASSWORD: stydu4_pass
+      MYSQL_ROOT_PASSWORD: root_password
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "3307:3306"  
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d  # Optional: SQL init scripts
+    networks:
+      - stydu4-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: stydu4-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379" 
+      - redis_data:/data
+    networks:
+      - stydu4-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stydu4-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Database connection
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_stydu4?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: stydu4_user
+      SPRING_DATASOURCE_PASSWORD: stydu4_pass
+
+      # Redis connection
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
+      # Frontend URL
+      APP_FRONTEND_URL: http://localhost:5173
+      APP_FRONTEND_BASE_URL: http://localhost:8080
+
+      # File storage
+      FILE_STORAGE_LOCATION: /app/storage
+
+      # JWT Configuration (CHANGE THESE IN PRODUCTION!)
+      JWT_SIGNER_KEY: ${JWT_SIGNER_KEY:-your-secret-key-min-32-characters-long-for-hs512-algorithm}
+
+      # Google OAuth (optional - remove if not using)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+
+      # Email Configuration (optional - remove if not using)
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@stydu4.com}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+
+      # Stripe Configuration (optional - remove if not using)
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+      # Java Options
+      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
+
+    volumes:
+      - app_storage:/app/storage
+      - app_logs:/app/logs
+
+    networks:
+      - stydu4-network
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+# Volumes for data persistence
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_storage:
+    driver: local
+  app_logs:
+    driver: local
+
+# Network
+networks:
+  stydu4-network:
+    driver: bridge

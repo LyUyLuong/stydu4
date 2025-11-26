@@ -1,5 +1,6 @@
 package com.lul.Stydu4.service.impl;
 
+import com.lul.Stydu4.dto.request.Answer.AnswerCreateRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestCreateRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestSearchRequest;
 import com.lul.Stydu4.dto.request.Question.QuestionTestUpdateRequest;
@@ -193,7 +194,13 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         QuestionTestEntity questionTest = questionTestRepository.findById(questionTestId)
                 .orElseThrow(() -> new AppException(ErrorCode.QUESTION_NOT_FOUND));
 
-        return questionTestMapper.toQuestionDetailResponse(questionTest);
+        QuestionTestDetailResponse response = questionTestMapper.toQuestionDetailResponse(questionTest);
+        
+        log.info("Question fetched - Audio: {} (URL: {}), Image: {} (URL: {})",
+                response.getAudioId(), response.getAudioUrl(),
+                response.getImageId(), response.getImageUrl());
+        
+        return response;
     }
 
     @Override
@@ -259,20 +266,39 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             existing.setQuestionGroupEntity(questionGroup);
         }
 
-        // Update Answers
-        if (request.getAnswerIds() != null && !request.getAnswerIds().isEmpty()) {
-            List<AnswerEntity> newAnswers = answerRepository.findAllById(request.getAnswerIds());
-
-            if (newAnswers.size() != request.getAnswerIds().size()) {
-                throw new AppException(ErrorCode.ANSWER_NOT_FOUND);
+        // ✅ Update Answers - Update existing answers in place to preserve foreign key references
+        if (request.getAnswers() != null && !request.getAnswers().isEmpty()) {
+            List<AnswerEntity> existingAnswers = existing.getAnswers();
+            List<AnswerCreateRequest> newAnswersData = request.getAnswers();
+            
+            // Update existing answers or create new ones
+            for (int i = 0; i < newAnswersData.size(); i++) {
+                AnswerCreateRequest answerReq = newAnswersData.get(i);
+                
+                if (i < existingAnswers.size()) {
+                    // Update existing answer in place (preserves foreign key references)
+                    AnswerEntity existingAnswer = existingAnswers.get(i);
+                    existingAnswer.setContent(answerReq.getContent());
+                    existingAnswer.setIsCorrect(answerReq.getIsCorrect());
+                    existingAnswer.setMark(answerReq.getMark());
+                } else {
+                    // Add new answer if request has more answers than existing
+                    AnswerEntity newAnswer = AnswerEntity.builder()
+                            .content(answerReq.getContent())
+                            .isCorrect(answerReq.getIsCorrect())
+                            .mark(answerReq.getMark())
+                            .question(existing)
+                            .build();
+                    existingAnswers.add(newAnswer);
+                }
             }
-
-            // Clear existing and add new
-            existing.getAnswers().clear();
-            newAnswers.forEach(answer -> {
-                answer.setQuestion(existing);
-                existing.getAnswers().add(answer);
-            });
+            
+            // Remove extra answers if existing has more than request
+            // Note: This will still fail if users have selected these answers
+            // In production, you might want to soft-delete or keep old answers
+            while (existingAnswers.size() > newAnswersData.size()) {
+                existingAnswers.remove(existingAnswers.size() - 1);
+            }
         }
 
         QuestionTestEntity updated = questionTestRepository.save(existing);
@@ -332,7 +358,14 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
             MultipartFile audio,
             MultipartFile image
     ) {
-        log.info("Creating question with files: {}", request.getName());
+        log.info("=== QuestionTestServiceImpl.createWithFiles ===");
+        log.info("Question name: {}", request.getName());
+        log.info("Audio file: {} (isEmpty: {})", 
+                audio != null ? audio.getOriginalFilename() : "null",
+                audio != null ? audio.isEmpty() : "null");
+        log.info("Image file: {} (isEmpty: {})", 
+                image != null ? image.getOriginalFilename() : "null",
+                image != null ? image.isEmpty() : "null");
 
         QuestionTestEntity entity = questionTestMapper.toQuestionTestEntity(request);
 
@@ -344,15 +377,15 @@ public class QuestionTestServiceImpl implements IQuestionTestService {
         );
         entity.setType(questionType);
 
-        // Set Part (required)
-        if (request.getPartId() != null) {
+        // Set Part (optional)
+        if (request.getPartId() != null && !request.getPartId().isBlank()) {
             PartTestEntity part = partTestRepository.findById(request.getPartId())
                     .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
             entity.setPartEntity(part);
         }
 
         // Set QuestionGroup (optional)
-        if (request.getQuestionGroupId() != null) {
+        if (request.getQuestionGroupId() != null && !request.getQuestionGroupId().isBlank()) {
             QuestionGroupEntity group = questionGroupRepository.findById(request.getQuestionGroupId())
                     .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
             entity.setQuestionGroupEntity(group);

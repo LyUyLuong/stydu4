@@ -1,6 +1,7 @@
 package com.lul.Stydu4.service.impl;
 
 import com.lul.Stydu4.configuration.FileStorageProperties;
+import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.entity.FileEntity;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.FileType;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -167,12 +170,28 @@ public class FileStorageServiceImpl implements IFileStorageService {
         log.info("Getting all files by type: {}", fileType);
         return fileRepository.findByFileType(fileType);
     }
+    
+    @Override
+    public PageResponse<FileEntity> getFilesByTypeWithPagination(FileType fileType, Pageable pageable) {
+        log.info("Getting files by type: {} with pagination - page: {}, size: {}", 
+                fileType, pageable.getPageNumber(), pageable.getPageSize());
+        
+        Page<FileEntity> page = fileRepository.findByFileType(fileType, pageable);
+        
+        return PageResponse.<FileEntity>builder()
+                .currentPage(page.getNumber() + 1)
+                .pageSize(page.getSize())
+                .totalPages(page.getTotalPages())
+                .totalElements(page.getTotalElements())
+                .data(page.getContent())
+                .build();
+    }
 
     // =============== PRIVATE HELPER METHODS ===============
 
     private String buildFileUrl(String fileId) {
         return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/v1/files/")
+                .path("/files/")
                 .path(fileId)
                 .toUriString();
     }
@@ -190,11 +209,26 @@ public class FileStorageServiceImpl implements IFileStorageService {
         }
 
         String extension = getFileExtension(filename);
-        FileStorageProperties.FileConfig config = fileType == FileType.IMAGE
-                ? fileStorageProperties.getUpload().getImages()
-                : fileStorageProperties.getUpload().getAudio();
+        FileStorageProperties.FileConfig config;
 
-        if (config.getAllowedExtensions() != null &&
+        switch (fileType) {
+            case IMAGE:
+                config = fileStorageProperties.getUpload().getImages();
+                break;
+            case AUDIO:
+                config = fileStorageProperties.getUpload().getAudio();
+                break;
+            case VIDEO:
+                config = fileStorageProperties.getUpload().getVideos();
+                break;
+            case DOCUMENT:
+                config = fileStorageProperties.getUpload().getDocuments();
+                break;
+            default:
+                config = fileStorageProperties.getUpload().getDocuments();
+        }
+
+        if (config != null && config.getAllowedExtensions() != null &&
                 !config.getAllowedExtensions().contains(extension.toLowerCase())) {
             log.error("Invalid file extension: {}. Allowed: {}",
                     extension, config.getAllowedExtensions());

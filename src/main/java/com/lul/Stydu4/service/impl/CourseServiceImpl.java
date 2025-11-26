@@ -51,7 +51,8 @@ public class CourseServiceImpl implements com.lul.Stydu4.service.ICourseService 
 
     @Override
     public CourseResponse getCourseById(String id) {
-        CourseEntity course = courseRepository.findById(id)
+        // ✅ Use optimized query to prevent N+1 problem when accessing tests
+        CourseEntity course = courseRepository.findByIdWithTests(id)
                 .orElseThrow(() -> new AppException(ErrorCode.COURSE_NOT_FOUND));
         return mapToResponse(course);
     }
@@ -59,6 +60,13 @@ public class CourseServiceImpl implements com.lul.Stydu4.service.ICourseService 
     @Override
     public List<CourseResponse> getAllPublishedCourses() {
         return courseRepository.findByIsPublished(true).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CourseResponse> getAllCourses() {
+        return courseRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -85,6 +93,42 @@ public class CourseServiceImpl implements com.lul.Stydu4.service.ICourseService 
         course.setIsPublished(false);
         courseRepository.save(course);
         log.info("Unpublished course: {}", id);
+    }
+
+    @Override
+    @Transactional
+    public CourseResponse updateCourseImage(String id, String imageUrl) {
+        CourseEntity course = getCourseEntityById(id);
+        course.setImageUrl(imageUrl);
+        course = courseRepository.save(course);
+        log.info("Updated course image: {} with URL: {}", id, imageUrl);
+        return mapToResponse(course);
+    }
+
+    @Override
+    @Transactional
+    public CourseResponse updateCourse(String id, CourseCreationRequest request) {
+        CourseEntity course = getCourseEntityById(id);
+
+        // Update basic fields
+        course.setTitle(request.getTitle());
+        course.setDescription(request.getDescription());
+        course.setPrice(request.getPrice());
+        if (request.getImageUrl() != null) {
+            course.setImageUrl(request.getImageUrl());
+        }
+        course.setDuration(request.getDuration());
+
+        // Update tests if provided
+        if (request.getTestIds() != null) {
+            List<TestEntity> tests = testRepository.findAllById(request.getTestIds());
+            course.setTests(tests);
+        }
+
+        course = courseRepository.save(course);
+        log.info("Updated course: {}", id);
+
+        return mapToResponse(course);
     }
 
     private CourseResponse mapToResponse(CourseEntity course) {

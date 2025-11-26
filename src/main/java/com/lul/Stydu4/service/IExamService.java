@@ -39,4 +39,11 @@ public interface IExamService {
      * @return List of ExamResultResponse
      */
     List<ExamResultResponse> getUserExamResults(String testId, String userName);
+
+    /**
+     * Get all exam results for a user (across all tests)
+     * @param userName Current user ID
+     * @return List of ExamResultResponse
+     */
+    List<ExamResultResponse> getAllUserExamResults(String userName);
 }

@@ -27,6 +27,7 @@ public class QuestionTestEntity extends BaseEntity{
     private String content;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private QuestionType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -37,6 +38,8 @@ public class QuestionTestEntity extends BaseEntity{
     @JoinColumn(name = "audio_id")
     private FileEntity audio;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
 
