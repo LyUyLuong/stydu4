@@ -9,10 +9,7 @@ import com.lul.Stydu4.entity.UserEntity;
 import com.lul.Stydu4.enums.EnrollmentStatus;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.PaymentStatus;
-import com.lul.Stydu4.exception.CourseException;
-import com.lul.Stydu4.exception.EnrollmentException;
 import com.lul.Stydu4.exception.AppException;
-import com.lul.Stydu4.exception.PaymentException;
 import com.lul.Stydu4.repository.ICartRepository;
 import com.lul.Stydu4.repository.IEnrollmentRepository;
 import com.lul.Stydu4.repository.IOrderRepository;
@@ -61,19 +58,19 @@ public class PaymentServiceImpl implements IPaymentService {
             // 2. Validate course is published
             if (course.getIsPublished() == null || !course.getIsPublished()) {
                 log.warn("User {} attempted to purchase unpublished course {}", user.getId(), course.getId());
-                throw new CourseException(ErrorCode.COURSE_NOT_PUBLISHED);
+                throw new AppException(ErrorCode.COURSE_NOT_PUBLISHED);
             }
-            
+
             // 3. Validate course price is valid
             if (course.getPrice() == null || course.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
                 log.error("Course {} has invalid price: {}", course.getId(), course.getPrice());
-                throw new CourseException(ErrorCode.INVALID_COURSE_PRICE);
+                throw new AppException(ErrorCode.INVALID_COURSE_PRICE);
             }
-            
+
             // 4. Check if user already enrolled in this course
             if (enrollmentRepository.existsByUserIdAndCourseId(user.getId(), course.getId())) {
                 log.warn("User {} already enrolled in course {}", user.getId(), course.getId());
-                throw new EnrollmentException(ErrorCode.ENROLLMENT_ALREADY_EXISTS);
+                throw new AppException(ErrorCode.ENROLLMENT_ALREADY_EXISTS);
             }
             
             // ===== CREATE ORDER AND PAYMENT =====
@@ -145,6 +142,17 @@ public class PaymentServiceImpl implements IPaymentService {
             // Tìm order trong DB
             OrderEntity order = orderRepository.findByStripeSessionId(sessionId)
                     .orElseThrow(() -> new Exception("Không tìm thấy order"));
+
+            // IDEMPOTENT CHECK: If already completed, return success immediately
+            if (order.getStatus() == PaymentStatus.COMPLETED) {
+                log.info("Order {} already completed. Idempotent request.", order.getId());
+                return PaymentResponse.builder()
+                        .orderId(order.getId())
+                        .sessionId(session.getId())
+                        .checkoutUrl(null)
+                        .status("COMPLETED")
+                        .build();
+            }
 
             // Kiểm tra payment status
             if ("paid".equals(session.getPaymentStatus())) {
@@ -231,14 +239,20 @@ public class PaymentServiceImpl implements IPaymentService {
         try {
             // Get all cart items for user
             List<CartEntity> cartItems = cartRepository.findByUserId(userId);
-            
+
             if (cartItems.isEmpty()) {
                 log.warn("No cart items found for user: {}", userId);
                 return false;
             }
-            
+
             // Create orders and enrollments for each cart item
             for (CartEntity cartItem : cartItems) {
+                // IDEMPOTENT CHECK: Skip if user already enrolled in this course
+                if (enrollmentRepository.existsByUserIdAndCourseId(userId, cartItem.getCourse().getId())) {
+                    log.info("User {} already enrolled in course {}. Skipping.", userId, cartItem.getCourse().getId());
+                    continue;
+                }
+
                 // Create order
                 OrderEntity order = OrderEntity.builder()
                         .user(cartItem.getUser())
@@ -249,7 +263,7 @@ public class PaymentServiceImpl implements IPaymentService {
                         .stripePaymentIntentId(session.getPaymentIntent())
                         .build();
                 order = orderRepository.save(order);
-                
+
                 // Create enrollment
                 EnrollmentEntity enrollment = EnrollmentEntity.builder()
                         .user(cartItem.getUser())
@@ -290,24 +304,40 @@ public class PaymentServiceImpl implements IPaymentService {
             // Find order by session ID
             OrderEntity order = orderRepository.findByStripeSessionId(sessionId)
                     .orElse(null);
-            
+
             if (order == null) {
                 log.warn("No order found for session: {}", sessionId);
                 return false;
             }
-            
+
             // Security check: verify the user owns this order
             if (!order.getUser().getId().equals(userId)) {
-                log.error("Security violation: User {} attempted to process order for user {}", 
+                log.error("Security violation: User {} attempted to process order for user {}",
                         userId, order.getUser().getId());
                 return false;
             }
-            
+
+            // IDEMPOTENT CHECK: If order already completed, return success
+            if (order.getStatus() == PaymentStatus.COMPLETED) {
+                log.info("Order {} already completed. Idempotent request.", order.getId());
+                return true;
+            }
+
+            // IDEMPOTENT CHECK: If enrollment already exists, just update order status
+            if (enrollmentRepository.existsByUserIdAndCourseId(userId, order.getCourse().getId())) {
+                log.warn("Enrollment already exists for user {} and course {}. Updating order status only.",
+                        userId, order.getCourse().getId());
+                order.setStatus(PaymentStatus.COMPLETED);
+                order.setStripePaymentIntentId(session.getPaymentIntent());
+                orderRepository.save(order);
+                return true;
+            }
+
             // Update order status
             order.setStatus(PaymentStatus.COMPLETED);
             order.setStripePaymentIntentId(session.getPaymentIntent());
             order = orderRepository.save(order);
-            
+
             // Create enrollment
             EnrollmentEntity enrollment = EnrollmentEntity.builder()
                     .user(order.getUser())

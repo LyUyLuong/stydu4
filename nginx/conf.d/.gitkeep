@@ -1,0 +1,2 @@
+# nginx renders default.conf into this directory at container startup
+# (envsubst from /etc/nginx/templates/default.conf.template). Do not edit by hand.
