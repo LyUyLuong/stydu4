@@ -53,6 +53,12 @@ public class SecurityConfig {
     private final CustomJwtDecoder jwtDecoder;
     private final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler;
 
+    // Comes from app.frontend.url (driven by APP_FRONTEND_URL env var in prod).
+    // Required so the deployed origin is allowed by CORS — otherwise the browser
+    // gets 403 on /auth/token even though the endpoint is permitAll.
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     @Autowired
     public SecurityConfig(CustomJwtDecoder jwtDecoder, OAuth2LoginSuccessHandler oauth2LoginSuccessHandler) {
         this.jwtDecoder = jwtDecoder;
@@ -128,11 +134,12 @@ public class SecurityConfig {
 
         // Cho phép các origin (frontend URLs)
         configuration.setAllowedOrigins(Arrays.asList(
+                frontendUrl,                // production domain (from env)
                 "http://localhost:3000",
-                "http://localhost:4200",    
-                "http://localhost:5173",   
-                "http://localhost:5500",    
-                "http://127.0.0.1:5500"     
+                "http://localhost:4200",
+                "http://localhost:5173",
+                "http://localhost:5500",
+                "http://127.0.0.1:5500"
         ));
 
         // Cho phép tất cả HTTP methods
