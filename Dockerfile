@@ -21,15 +21,16 @@ WORKDIR /app
 # Install curl for health checks
 RUN apk add --no-cache curl
 
-# Create non-root user for security
-RUN addgroup -S spring && adduser -S spring -G spring
+# Create non-root user for security, plus writable directories owned by it.
+# (mkdir/chown must run as root, BEFORE the USER switch.)
+RUN addgroup -S spring && adduser -S spring -G spring \
+ && mkdir -p /app/storage /app/logs \
+ && chown -R spring:spring /app
+
+# Copy JAR from build stage (chown so the runtime user can read it)
+COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
+
 USER spring:spring
-
-# Copy JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
-
-# Create directories for storage and logs
-RUN mkdir -p /app/storage /app/logs
 
 # Expose application port
 EXPOSE 8080
