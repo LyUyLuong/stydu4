@@ -1,16 +1,19 @@
 # Production deployment compose for Stydu4
-# Topology: nginx reverse-proxy on :80/:443 -> { /api/v1/* -> app ; /* -> frontend }
-#           certbot obtains and renews Let's Encrypt certs (webroot challenge)
-#           mysql/redis/app/frontend are internal-only (no host port exposure)
+# Topology: Cloudflare Tunnel -> cloudflared -> nginx (HTTP-only routing)
+#                                                 ├── /api/v1/* -> app:8080
+#                                                 └── /*        -> frontend:80
+#
+# All services are on an internal docker network. Nothing is exposed to the host
+# network — Cloudflare Tunnel makes the site reachable from the Internet without
+# opening any inbound ports on the VPS (perfect for restricted hosts like BKHOST).
 #
 # Layout on host (clone both repos as siblings):
 #   ~/deploy/stydu4/                  (this repo, run docker compose here)
 #   ~/deploy/stydu4-frontend/         (frontend repo)
 #
 # First-time setup:
-#   1. cp .env.example .env  &&  edit values
-#   2. ./init-letsencrypt.sh           (bootstrap SSL cert)
-#   3. docker compose up -d
+#   1. cp .env.example .env  &&  edit values (incl. CLOUDFLARE_TUNNEL_TOKEN)
+#   2. docker compose up -d --build
 
 services:
   mysql:
@@ -114,20 +117,15 @@ services:
     depends_on:
       - app
 
+  # Internal-only HTTP router. Cloudflare Tunnel sends traffic here; nginx
+  # routes /api/v1/* to Spring Boot and everything else to the React frontend.
+  # No host port mapping — only reachable from within the docker network.
   nginx:
     image: nginx:1.27-alpine
     container_name: stydu4-nginx
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
-      # templates: read-only source for envsubst
-      # conf.d:    NOT mounted from host — envsubst writes the rendered config
-      #            into the container's own /etc/nginx/conf.d at startup
       - ./nginx/templates:/etc/nginx/templates:ro
-      - certbot_etc:/etc/letsencrypt:ro
-      - certbot_www:/var/www/certbot:ro
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
     command: >
@@ -140,22 +138,23 @@ services:
       - frontend
       - app
 
-  certbot:
-    image: certbot/certbot:latest
-    container_name: stydu4-certbot
+  # Cloudflare Tunnel connector. Establishes an outbound connection to
+  # Cloudflare's edge; no inbound ports needed on the VPS.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: stydu4-cloudflared
     restart: unless-stopped
-    volumes:
-      - certbot_etc:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - stydu4-network
+    depends_on:
+      - nginx
 
 volumes:
   mysql_data:
   redis_data:
   app_storage:
   app_logs:
-  certbot_etc:
-  certbot_www:
 
 networks:
   stydu4-network:
