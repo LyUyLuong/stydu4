@@ -122,7 +122,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # templates: read-only source for envsubst
+      # conf.d:    NOT mounted from host — envsubst writes the rendered config
+      #            into the container's own /etc/nginx/conf.d at startup
       - ./nginx/templates:/etc/nginx/templates:ro
       - certbot_etc:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
