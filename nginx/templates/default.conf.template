@@ -42,6 +42,7 @@ server {
         # Cloudflare sends the original scheme in CF-Visitor; honour it for HSTS,
         # cookies, and absolute URL generation in Spring Boot.
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
     }
@@ -54,5 +55,6 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
     }
 }
