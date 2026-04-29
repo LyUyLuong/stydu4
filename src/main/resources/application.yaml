@@ -19,7 +19,12 @@ spring:
             scope:
               - email
               - profile
-            redirect-uri: "http://localhost:${server.port}/api/v1/login/oauth2/code/google"
+            # Use Spring's {baseUrl} placeholder so the redirect URI follows whatever
+            # host the app is being served at (localhost in dev, stydu4.online in prod).
+            # Combined with `server.forward-headers-strategy: framework` below, Spring
+            # honours X-Forwarded-Proto/Host from nginx + Cloudflare → so {baseUrl}
+            # resolves to https://stydu4.online behind the tunnel, not http://nginx.
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
@@ -51,6 +56,10 @@ spring:
 server:
   servlet:
     context-path: /api/v1
+  # Honour X-Forwarded-* headers set by nginx + Cloudflare Tunnel, so that
+  # generated absolute URLs (OAuth2 redirect, ServletUriComponentsBuilder, etc.)
+  # use https://stydu4.online instead of http://nginx.
+  forward-headers-strategy: framework
 
 app:
   frontend:
