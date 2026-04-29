@@ -47,7 +47,10 @@ public class SecurityConfig {
             "/files/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            // Actuator health/info — needed for the docker container healthcheck
+            // (curl in Dockerfile) to pass without auth.
+            "/actuator/**"
     };
 
     private final CustomJwtDecoder jwtDecoder;
