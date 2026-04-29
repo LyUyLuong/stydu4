@@ -64,6 +64,9 @@ services:
     command: redis-server --appendonly yes
 
   app:
+    # CI builds and pushes this tag to ghcr.io; VPS pulls instead of building.
+    # `build:` is kept so `docker compose build` still works locally for dev.
+    image: ghcr.io/lyuyluong/stydu4:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -107,6 +110,9 @@ services:
       start_period: 90s
 
   frontend:
+    # CI builds and pushes this tag to ghcr.io; VPS pulls instead of building.
+    # `build:` is kept so `docker compose build` still works locally for dev.
+    image: ghcr.io/lyuyluong/stydu4-frontend:latest
     build:
       context: ../stydu4-frontend
       dockerfile: Dockerfile

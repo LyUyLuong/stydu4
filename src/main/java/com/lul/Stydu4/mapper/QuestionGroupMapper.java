@@ -30,9 +30,12 @@ public interface QuestionGroupMapper {
     @Mapping(source = "partEntity.id", target = "partTestId")
     @Mapping(source = "questions", target = "questions")
     @Mapping(source = "image.id", target = "imageId")
-    @Mapping(source = "image.fileUrl", target = "imageUrl")
+    // Build relative URL from id; never read fileUrl (legacy rows hold absolute localhost URLs).
+    @Mapping(target = "imageUrl",
+             expression = "java(entity.getImage() != null ? \"/api/v1/files/\" + entity.getImage().getId() : null)")
     @Mapping(source = "audio.id", target = "audioId")
-    @Mapping(source = "audio.fileUrl", target = "audioUrl")
+    @Mapping(target = "audioUrl",
+             expression = "java(entity.getAudio() != null ? \"/api/v1/files/\" + entity.getAudio().getId() : null)")
     QuestionGroupDetailResponse toQuestionGroupDetailResponse(QuestionGroupEntity entity);
 
     // ✅ NEW: Entity → Summary Response with file references
@@ -40,8 +43,11 @@ public interface QuestionGroupMapper {
     @Mapping(target = "questionsCount",
             expression = "java(entity.getQuestions() == null ? 0 : entity.getQuestions().size())")
     @Mapping(source = "image.id", target = "imageId")
-    @Mapping(source = "image.fileUrl", target = "imageUrl")
+    // Build relative URL from id; never read fileUrl (legacy rows hold absolute localhost URLs).
+    @Mapping(target = "imageUrl",
+             expression = "java(entity.getImage() != null ? \"/api/v1/files/\" + entity.getImage().getId() : null)")
     @Mapping(source = "audio.id", target = "audioId")
-    @Mapping(source = "audio.fileUrl", target = "audioUrl")
+    @Mapping(target = "audioUrl",
+             expression = "java(entity.getAudio() != null ? \"/api/v1/files/\" + entity.getAudio().getId() : null)")
     QuestionGroupSummaryResponse toQuestionGroupSummaryResponse(QuestionGroupEntity entity);
 }

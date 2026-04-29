@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -190,10 +189,10 @@ public class FileStorageServiceImpl implements IFileStorageService {
     // =============== PRIVATE HELPER METHODS ===============
 
     private String buildFileUrl(String fileId) {
-        return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/files/")
-                .path(fileId)
-                .toUriString();
+        // Relative path so files work behind any reverse proxy / domain
+        // (Cloudflare Tunnel, dev localhost, prod) without baking the host
+        // into the DB-stored URL.
+        return "/api/v1/files/" + fileId;
     }
 
     private void validateFile(MultipartFile file, FileType fileType) {

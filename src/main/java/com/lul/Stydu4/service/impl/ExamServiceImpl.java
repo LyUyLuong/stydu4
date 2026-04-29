@@ -19,7 +19,6 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,9 +44,10 @@ public class ExamServiceImpl implements IExamService {
     final QuestionTestMapper questionTestMapper;
     final QuestionGroupMapper questionGroupMapper;
 
-    // ✅ NEW - Base URL for file access
-    @Value("${app.base-url:http://localhost:8080}")
-    String baseUrl;
+    // File URL prefix. Relative path so the browser resolves against the
+    // current origin (works in dev, localhost, and any production domain
+    // without configuration).
+    private static final String FILE_URL_PREFIX = "/api/v1/files/";
 
     @Override
     @Transactional(readOnly = true)
@@ -267,10 +267,9 @@ public class ExamServiceImpl implements IExamService {
 
     // =============== PRIVATE HELPER METHODS ===============
 
-    // ✅ NEW - Build file URL helper
     private String buildFileUrl(String fileId) {
         if (fileId == null) return null;
-        return baseUrl + "/api/v1/files/" + fileId;
+        return FILE_URL_PREFIX + fileId;
     }
 
     private PartQuestionsDetail mapPartToDetail(PartTestEntity part) {

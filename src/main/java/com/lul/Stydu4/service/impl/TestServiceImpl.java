@@ -229,7 +229,7 @@ public class TestServiceImpl implements ITestService {
     @Override
     @Cacheable(value = "test-details", key = "#testId")
     public TestDetailResponse getTestById(String testId) {
-        log.debug("Cache miss - Loading test details from database: {}", testId);
+        log.info("Loading test from database (cache miss): {}", testId);
         // Use optimized query with EntityGraph to prevent N+1 problem
         TestEntity test = testRepository.findByIdWithParts(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));

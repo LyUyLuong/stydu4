@@ -29,13 +29,19 @@ public interface TestMapper {
     @Mapping(source = "type.name", target = "type")
     @Mapping(source = "partTestEntities", target = "parts")
     @Mapping(source = "audio.id", target = "audioId")           // ✅ NEW
-    @Mapping(source = "audio.fileUrl", target = "audioUrl")     // ✅ NEW
+    // Build relative URL from id rather than reading audio.fileUrl,
+    // because legacy uploads stored absolute URLs (e.g. http://localhost:8080/...).
+    @Mapping(target = "audioUrl",
+             expression = "java(entity.getAudio() != null ? \"/api/v1/files/\" + entity.getAudio().getId() : null)")
     TestDetailResponse toTestResponse(TestEntity entity);
 
     // ✅ UPDATED - Entity to Summary Response
     @Mapping(source = "type.name", target = "type")
     @Mapping(target = "partsCount", ignore = true)
     @Mapping(source = "audio.id", target = "audioId")           // ✅ NEW
-    @Mapping(source = "audio.fileUrl", target = "audioUrl")     // ✅ NEW
+    // Build relative URL from id rather than reading audio.fileUrl,
+    // because legacy uploads stored absolute URLs (e.g. http://localhost:8080/...).
+    @Mapping(target = "audioUrl",
+             expression = "java(entity.getAudio() != null ? \"/api/v1/files/\" + entity.getAudio().getId() : null)")
     TestSummaryResponse toTestSummary(TestEntity entity);
 }

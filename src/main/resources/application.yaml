@@ -104,6 +104,7 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type: INFO
     org.springframework.data.redis: INFO
+    org.springframework.cache: DEBUG
     org.springframework.security.oauth2: DEBUG
 
 file:
