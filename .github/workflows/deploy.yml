@@ -61,6 +61,9 @@ jobs:
             cd ~/deploy/stydu4
             git pull origin deploy
             docker compose pull app
-            docker compose up -d app
+            # --force-recreate so a new image with the same :latest tag actually
+            # replaces the running container (compose otherwise treats unchanged
+            # config as "no work to do" and leaves the old container running).
+            docker compose up -d --force-recreate app
             docker image prune -f
             docker compose ps app
