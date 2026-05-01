@@ -32,6 +32,18 @@ server {
     gzip_min_length 1024;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
 
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    location ~* (?:\.(?:bak|config|sql|fla|psd|ini|log|sh|inc|swp|dist)|~)$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
     # API -> Spring Boot
     location /api/v1/ {
         proxy_pass http://spring_backend;

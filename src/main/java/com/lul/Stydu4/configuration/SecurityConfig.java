@@ -39,6 +39,10 @@ public class SecurityConfig {
             "/auth/introspect",
             "/auth/logout",
             "/auth/refresh",
+            // Stripe POSTs webhook events here; signature is verified inside the
+            // controller using the shared webhook secret, so it does not need
+            // user authentication.
+            "/webhook/**",
     };
     
     private final String[] PUBLIC_GET_ENDPOINTS = {
