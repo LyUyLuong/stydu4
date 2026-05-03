@@ -25,6 +25,15 @@ spring:
       ddl-auto: update
     properties:
       format_sql: true
+      hibernate:
+        # Khi truy cập 1 lazy collection trên N entity, Hibernate gom
+        # WHERE id IN (?,?,...) tối đa 16 id thay vì bắn N câu SELECT lẻ.
+        default_batch_fetch_size: 16
+        jdbc:
+          # Gom INSERT/UPDATE batch khi save nhiều answers/questions cùng lúc.
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
     show-sql: true
 
 

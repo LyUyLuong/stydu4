@@ -24,45 +24,5 @@ public interface IPartTestRepository extends JpaRepository<PartTestEntity, Strin
             "where p.testEntity.id in :ids " +
             "group by p.testEntity.id")
     List<Object[]> countByTestIds(@Param("ids") List<String> testIds);
-    
-    /**
-     * Find part by ID with all nested entities loaded (prevent N+1)
-     * Loads: questionGroups, questionTests, and their audio/image/answers/questions
-     */
-    @EntityGraph(attributePaths = {
-        "questionGroups",
-        "questionGroups.audio",
-        "questionGroups.image",
-        "questionGroups.questions",
-        "questionGroups.questions.audio",
-        "questionGroups.questions.image",
-        "questionGroups.questions.answers",
-        "questionTests",
-        "questionTests.audio",
-        "questionTests.image",
-        "questionTests.answers"
-    })
-    @Query("SELECT p FROM PartTestEntity p WHERE p.id = :id")
-    Optional<PartTestEntity> findByIdWithQuestions(@Param("id") String id);
-
-    /**
-     * Find parts by test ID with all nested entities loaded (prevent N+1)
-     * Loads: questionGroups, questionTests, and their audio/image/answers/questions
-     */
-    @EntityGraph(attributePaths = {
-        "questionGroups",
-        "questionGroups.audio",
-        "questionGroups.image",
-        "questionGroups.questions",
-        "questionGroups.questions.audio",
-        "questionGroups.questions.image",
-        "questionGroups.questions.answers",
-        "questionTests",
-        "questionTests.audio",
-        "questionTests.image",
-        "questionTests.answers"
-    })
-    @Query("SELECT p FROM PartTestEntity p WHERE p.testEntity.id = :testId ORDER BY p.createdDate ASC")
-    List<PartTestEntity> findByTestEntityIdWithQuestions(@Param("testId") String testId);
 }
 

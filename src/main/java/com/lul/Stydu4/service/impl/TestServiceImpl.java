@@ -56,6 +56,8 @@ public class TestServiceImpl implements ITestService {
     IFileStorageService fileStorageService;
     IFileRepository fileRepository;
 
+    PartTestHydrator partTestHydrator;
+
     @Override
     public TestDetailResponse create(TestCreationRequest request) {
         TestEntity entity = testMapper.toTestEntity(request);
@@ -227,18 +229,27 @@ public class TestServiceImpl implements ITestService {
 
 
     @Override
+    @Transactional(readOnly = true)
     @Cacheable(value = "test-details", key = "#testId")
     public TestDetailResponse getTestById(String testId) {
         log.info("Loading test from database (cache miss): {}", testId);
-        // Use optimized query with EntityGraph to prevent N+1 problem
-        TestEntity test = testRepository.findByIdWithParts(testId)
+
+        // Q1: test + audio (1 row, 1 LEFT JOIN)
+        TestEntity test = testRepository.findByIdWithAudio(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
-        TestDetailResponse testDetailResponse = testMapper.toTestResponse(test);
-        List<PartTestDetailResponse> partTestDetailRespons = test.getPartTestEntities().stream().map(partTestMapper::toPartTestResponse).toList();
-        testDetailResponse.setParts(partTestDetailRespons);
+        // Q2: parts của test (phẳng, không nested)
+        List<PartTestEntity> parts =
+                partTestRepository.findByTestEntityIdOrderByCreatedDateAsc(testId);
 
-        return testDetailResponse;
+        if (!parts.isEmpty()) {
+            // Q3-Q6: hydrate parts (questions + groups + answers) trong 4 query phẳng
+            partTestHydrator.hydrate(parts);
+        }
+
+        // Gắn lại vào aggregate root rồi để mapper trả response
+        test.setPartTestEntities(parts);
+        return testMapper.toTestResponse(test);
     }
 
     @Override

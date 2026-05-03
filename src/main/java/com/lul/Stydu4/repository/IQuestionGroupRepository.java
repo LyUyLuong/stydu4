@@ -21,25 +21,14 @@ public interface IQuestionGroupRepository extends JpaRepository<QuestionGroupEnt
             "group by qg.partEntity.id")
     List<Object[]> countQuestionGroupsByPartIds(@Param("partIds") List<String> partIds);
 
-    /**
-     * Find all question groups with related entities (prevent N+1)
-     * WARNING: This can be heavy, use with pagination
-     */
-    @EntityGraph(attributePaths = {"audio", "image", "questions", "questions.audio", "questions.image"})
-    @Override
-    java.util.List<QuestionGroupEntity> findAll();
-    
-    /**
-     * Find question group by ID with all related entities (prevent N+1)
-     */
-    @EntityGraph(attributePaths = {"audio", "image", "questions", "questions.audio", "questions.image", "questions.answers"})
+    /** Detail view 1 group — chỉ kéo audio + image, questions/answers do service lo. */
+    @EntityGraph(attributePaths = {"audio", "image"})
     @Query("SELECT qg FROM QuestionGroupEntity qg WHERE qg.id = :id")
-    Optional<QuestionGroupEntity> findByIdWithDetails(@Param("id") String id);
-    
-    /**
-     * Find question groups by part ID with related entities (prevent N+1)
-     */
-    @EntityGraph(attributePaths = {"audio", "image", "questions", "questions.audio", "questions.image", "questions.answers"})
-    @Query("SELECT qg FROM QuestionGroupEntity qg WHERE qg.partEntity.id = :partId")
-    List<QuestionGroupEntity> findByPartIdWithDetails(@Param("partId") String partId);
+    Optional<QuestionGroupEntity> findByIdWithMedia(@Param("id") String id);
+
+    /** Toàn bộ group của một loạt part — dùng cho stepwise hydrate. */
+    @EntityGraph(attributePaths = {"audio", "image"})
+    @Query("SELECT qg FROM QuestionGroupEntity qg " +
+            "WHERE qg.partEntity.id IN :partIds")
+    List<QuestionGroupEntity> findByPartIdsWithMedia(@Param("partIds") List<String> partIds);
 }

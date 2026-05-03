@@ -53,6 +53,8 @@ public class PartTestServiceImpl implements IPartTestService {
     IQuestionTestRepository questionTestRepository;
     IQuestionGroupRepository questionGroupRepository;
 
+    PartTestHydrator partTestHydrator;
+
     @Override
     public PartTestDetailResponse create(PartTestCreationRequest request) {
         // Map basic fields
@@ -149,33 +151,57 @@ public class PartTestServiceImpl implements IPartTestService {
 
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponse<PartTestSummaryResponse> getAllPartTests(int page, int size) {
-
         int pageNo = page > 0 ? page - 1 : 0;
-
+        int pageSize = Math.min(size, 100);
         Sort sort = Sort.by(Sort.Direction.DESC, "createdDate");
-
-        Pageable pageable = PageRequest.of(pageNo,size,sort);
-
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
         Page<PartTestEntity> partTestEntities = partTestRepository.findAllBy(pageable);
+        List<PartTestSummaryResponse> data;
 
-        List<PartTestSummaryResponse> partTestSummaries = partTestEntities.getContent().stream().map(partTestMapper::toPartTestSummary).toList();
+        if (partTestEntities.isEmpty()) {
+            data = List.of();
+        } else {
+            // Bulk count tránh N+1 do mapper expression entity.getQuestions().size()
+            var partIds = partTestEntities.getContent().stream()
+                    .map(PartTestEntity::getId)
+                    .toList();
+
+            var questionCounts = questionTestRepository.countQuestionsByPartIds(partIds).stream()
+                    .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+            var groupCounts = questionGroupRepository.countQuestionGroupsByPartIds(partIds).stream()
+                    .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+
+            data = partTestEntities.getContent().stream().map(e -> {
+                var dto = partTestMapper.toPartTestSummary(e);
+                dto.setQuestionsCount(questionCounts.getOrDefault(e.getId(), 0L).intValue());
+                dto.setQuestionGroupsCount(groupCounts.getOrDefault(e.getId(), 0L).intValue());
+                return dto;
+            }).toList();
+        }
 
         return PageResponse.<PartTestSummaryResponse>builder()
-                .currentPage(pageNo+1)
+                .currentPage(pageNo + 1)
                 .totalPages(partTestEntities.getTotalPages())
                 .totalElements(partTestEntities.getTotalElements())
-                .pageSize(size)
-                .data(partTestSummaries)
+                .pageSize(pageSize)
+                .data(data)
                 .build();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PartTestDetailResponse getPartTestById(String partTestId) {
-        // ✅ Use optimized query to prevent N+1 problem
-        PartTestEntity partTest = partTestRepository.findByIdWithQuestions(partTestId)
+
+        PartTestEntity partTest = partTestRepository.findById(partTestId)
                 .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
+
+        List<PartTestEntity> single = new ArrayList<>(1);
+        single.add(partTest);
+        partTestHydrator.hydrate(single);
+
         return partTestMapper.toPartTestResponse(partTest);
     }
 
