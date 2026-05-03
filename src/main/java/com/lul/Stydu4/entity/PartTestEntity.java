@@ -13,6 +13,10 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Builder
+@Table(name = "part_test_entity", indexes = {
+        @Index(name = "idx_part_test_id_created", columnList = "test_id, createdDate"),
+        @Index(name = "idx_part_created", columnList = "createdDate")
+})
 public class PartTestEntity extends BaseEntity {
 
     @Id

@@ -259,24 +259,26 @@ public class TestServiceImpl implements ITestService {
         testRepository.deleteById(testId);
     }
 
+
     @Override
+    @Transactional(readOnly = true)
     public PageResponse<TestSummaryResponse> getAllTests(int page, int size) {
-
         int pageNo = page > 0 ? page - 1 : 0;
-
+        int pageSize = Math.min(size, 100);
         Sort sort = Sort.by(Sort.Direction.DESC, "createdDate");
-
-        Pageable pageable = PageRequest.of(pageNo, size,sort);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
         Page<TestEntity> tests = testRepository.findAllBy(pageable);
 
-        List<TestSummaryResponse> testSummaries = tests.getContent().stream().map(testMapper::toTestSummary).toList();
+        List<TestSummaryResponse> testSummaries = tests.getContent().stream()
+                .map(testMapper::toTestSummary)
+                .toList();
 
         return PageResponse.<TestSummaryResponse>builder()
-                .currentPage(page)
+                .currentPage(pageNo + 1)
                 .totalPages(tests.getTotalPages())
                 .totalElements(tests.getTotalElements())
-                .pageSize(size)
+                .pageSize(pageSize)
                 .data(testSummaries)
                 .build();
     }

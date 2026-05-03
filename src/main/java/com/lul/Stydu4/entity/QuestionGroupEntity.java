@@ -12,6 +12,9 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Builder
+@Table(name = "question_group_entity", indexes = {
+        @Index(name = "idx_qg_created", columnList = "createdDate")
+})
 public class QuestionGroupEntity extends BaseEntity{
 
     @Id
