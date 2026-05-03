@@ -13,10 +13,7 @@ import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.QuestionGroupMapper;
-import com.lul.Stydu4.repository.IFileRepository;
-import com.lul.Stydu4.repository.IPartTestRepository;
-import com.lul.Stydu4.repository.IQuestionGroupRepository;
-import com.lul.Stydu4.repository.IQuestionTestRepository;
+import com.lul.Stydu4.repository.*;
 import com.lul.Stydu4.service.IFileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,6 +60,9 @@ class QuestionGroupServiceImplTest {
 
     @Mock
     private IFileStorageService fileStorageService;
+
+    @Mock
+    private IAnswerRepository answerRepository;
 
     @InjectMocks
     private QuestionGroupServiceImpl questionGroupService;
@@ -309,37 +309,38 @@ class QuestionGroupServiceImplTest {
         }
     }
 
-    @Nested
-    @DisplayName("getQuestionGroupById Tests")
-    class GetQuestionGroupByIdTests {
+    @Test
+    @DisplayName("Should return question group when ID exists")
+    void getQuestionGroupById_ValidId_Success() {
+        // GIVEN
+        when(questionGroupRepository.findByIdWithMedia("group-123"))
+                .thenReturn(Optional.of(questionGroup));
+        when(questionTestRepository.findByGroupIdsWithMedia(List.of("group-123")))
+                .thenReturn(java.util.Collections.emptyList());
+        when(questionGroupMapper.toQuestionGroupDetailResponse(questionGroup))
+                .thenReturn(detailResponse);
 
-        @Test
-        @DisplayName("Should return question group when ID exists")
-        void getQuestionGroupById_ValidId_Success() {
-            // GIVEN
-            when(questionGroupRepository.findByIdWithDetails("group-123")).thenReturn(Optional.of(questionGroup));
-            when(questionGroupMapper.toQuestionGroupDetailResponse(questionGroup)).thenReturn(detailResponse);
+        // WHEN
+        QuestionGroupDetailResponse result = questionGroupService.getQuestionGroupById("group-123");
 
-            // WHEN
-            QuestionGroupDetailResponse result = questionGroupService.getQuestionGroupById("group-123");
+        // THEN
+        assertThat(result).isNotNull();
+        assertThat(result.getId()).isEqualTo("group-123");
+        verify(questionGroupRepository).findByIdWithMedia("group-123");
+        verify(questionTestRepository).findByGroupIdsWithMedia(List.of("group-123"));
+    }
 
-            // THEN
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo("group-123");
-            verify(questionGroupRepository).findByIdWithDetails("group-123");
-        }
+    @Test
+    @DisplayName("Should throw exception when question group not found")
+    void getQuestionGroupById_InvalidId_ThrowException() {
+        // GIVEN
+        when(questionGroupRepository.findByIdWithMedia("invalid-id"))
+                .thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("Should throw exception when question group not found")
-        void getQuestionGroupById_InvalidId_ThrowException() {
-            // GIVEN
-            when(questionGroupRepository.findByIdWithDetails("invalid-id")).thenReturn(Optional.empty());
-
-            // WHEN & THEN
-            assertThatThrownBy(() -> questionGroupService.getQuestionGroupById("invalid-id"))
-                    .isInstanceOf(AppException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUESTION_GROUP_NOT_FOUND);
-        }
+        // WHEN & THEN
+        assertThatThrownBy(() -> questionGroupService.getQuestionGroupById("invalid-id"))
+                .isInstanceOf(AppException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUESTION_GROUP_NOT_FOUND);
     }
 
     @Nested
