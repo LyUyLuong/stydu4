@@ -8,21 +8,30 @@
 --   SHOW INDEX FROM question_test_entity;
 --   SHOW INDEX FROM question_group_entity;
 --
--- LƯU Ý: MySQL InnoDB tự tạo index 1 cột cho mọi FOREIGN KEY (test_id,
+-- LƯU Ý 1: MySQL InnoDB tự tạo index 1 cột cho mọi FOREIGN KEY (test_id,
 -- part_id, question_group_id, question_id...) → KHÔNG cần thêm index
 -- 1 cột trùng. Các index dưới đây đều là COMPOSITE hoặc cột phụ trợ
 -- mà FK-auto-index không thay thế được.
+--
+-- LƯU Ý 2: Cột timestamp trong DB là `created_date` (snake_case) do
+-- SpringPhysicalNamingStrategy convert từ @Column(name="createdDate")
+-- trong Java. Luôn dùng tên snake_case ở SQL tay.
 -- =========================================================================
 
+-- ⚠️ Khi chạy trên prod nhớ chọn đúng database trước:
+ USE db_stydu4;
+-- Khi chạy local:
+-- USE stydu5;
+
 -- PartTest: phục vụ findByTestEntityIdOrderByCreatedDateAsc
--- (WHERE test_id=? ORDER BY createdDate) → composite này loại bỏ filesort.
+-- (WHERE test_id=? ORDER BY created_date) → composite này loại bỏ filesort.
 ALTER TABLE part_test_entity
-    ADD INDEX idx_part_test_id_created (test_id, `createdDate`),
+    ADD INDEX idx_part_test_id_created (test_id, created_date),
     ALGORITHM=INPLACE, LOCK=NONE;
 
--- PartTest: pagination admin (ORDER BY createdDate DESC LIMIT/OFFSET).
+-- PartTest: pagination admin (ORDER BY created_date DESC LIMIT/OFFSET).
 ALTER TABLE part_test_entity
-    ADD INDEX idx_part_created (`createdDate`),
+    ADD INDEX idx_part_created (created_date),
     ALGORITHM=INPLACE, LOCK=NONE;
 
 -- QuestionTest: phục vụ findStandaloneByPartIds
@@ -33,12 +42,12 @@ ALTER TABLE question_test_entity
     ADD INDEX idx_question_part_group (part_id, question_group_id),
     ALGORITHM=INPLACE, LOCK=NONE;
 
--- QuestionTest: pagination admin và search ORDER BY createdDate.
+-- QuestionTest: pagination admin và search ORDER BY created_date.
 ALTER TABLE question_test_entity
-    ADD INDEX idx_question_created (`createdDate`),
+    ADD INDEX idx_question_created (created_date),
     ALGORITHM=INPLACE, LOCK=NONE;
 
 -- QuestionGroup: pagination admin.
 ALTER TABLE question_group_entity
-    ADD INDEX idx_qg_created (`createdDate`),
+    ADD INDEX idx_qg_created (created_date),
     ALGORITHM=INPLACE, LOCK=NONE;

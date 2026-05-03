@@ -86,6 +86,14 @@ public class RedisCacheConfig implements CachingConfigurer {
         // Test details cache - 1 hour TTL
         cacheConfigurations.put("test-details", 
             defaultConfig.entryTtl(Duration.ofHours(1)));
+
+        // List trang chủ /tests — TTL ngắn hơn vì admin có thể thay đổi
+        cacheConfigurations.put("tests-list",
+                defaultConfig.entryTtl(Duration.ofMinutes(10)));
+
+        // Search /tests/search & /tests/search-with-specification
+        cacheConfigurations.put("tests-search",
+                defaultConfig.entryTtl(Duration.ofMinutes(10)));
         
         // Courses cache - 2 hours TTL
         cacheConfigurations.put("courses", 

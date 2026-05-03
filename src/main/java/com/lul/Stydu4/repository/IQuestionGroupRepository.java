@@ -2,13 +2,11 @@ package com.lul.Stydu4.repository;
 
 import com.lul.Stydu4.entity.QuestionGroupEntity;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,4 +29,25 @@ public interface IQuestionGroupRepository extends JpaRepository<QuestionGroupEnt
     @Query("SELECT qg FROM QuestionGroupEntity qg " +
             "WHERE qg.partEntity.id IN :partIds")
     List<QuestionGroupEntity> findByPartIdsWithMedia(@Param("partIds") List<String> partIds);
+
+    long countByIdIn(Collection<String> ids);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE question_group_entity SET part_id = NULL WHERE part_id = :partId",
+            nativeQuery = true)
+    int detachAllByPartId(@Param("partId") String partId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE question_group_entity SET part_id = NULL " +
+            "WHERE part_id = :partId AND id NOT IN (:keepIds)",
+            nativeQuery = true)
+    int detachByPartIdExcluding(@Param("partId") String partId,
+                                @Param("keepIds") Collection<String> keepIds);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE question_group_entity SET part_id = :partId WHERE id IN (:ids)",
+            nativeQuery = true)
+    int attachToPart(@Param("partId") String partId,
+                     @Param("ids") Collection<String> ids);
+
 }

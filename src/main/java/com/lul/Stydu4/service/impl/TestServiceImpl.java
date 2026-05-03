@@ -29,6 +29,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -58,7 +59,10 @@ public class TestServiceImpl implements ITestService {
 
     PartTestHydrator partTestHydrator;
 
-    @Override
+    @Caching(evict = {
+            @CacheEvict(value = "tests-list", allEntries = true),
+            @CacheEvict(value = "tests-search", allEntries = true)
+    })
     public TestDetailResponse create(TestCreationRequest request) {
         TestEntity entity = testMapper.toTestEntity(request);
 
@@ -91,6 +95,10 @@ public class TestServiceImpl implements ITestService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "tests-list", allEntries = true),
+            @CacheEvict(value = "tests-search", allEntries = true)
+    })
     public TestDetailResponse createWithAudio(TestCreationRequest request, MultipartFile audio) {
         log.info("Creating test with audio file: {}",
                 audio != null ? audio.getOriginalFilename() : "none");
@@ -124,78 +132,74 @@ public class TestServiceImpl implements ITestService {
 
     @Transactional
     @Override
-    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
+    @Caching(evict = {
+            @CacheEvict(value = "test-details", key = "#testId"),
+            @CacheEvict(value = "tests-list", allEntries = true),
+            @CacheEvict(value = "tests-search", allEntries = true)
+    })
     public TestDetailResponse update(String testId, TestUpdateRequest request) {
         log.info("Updating test and invalidating cache: {}", testId);
+
         TestEntity existing = testRepository.findById(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
+        // ============ Phase 1: simple field updates ============
         if (request.getType() != null) {
             TestType testType = validateAndConvert(
-                    request.getType(),
-                    TestType.class,
-                    ErrorCode.INVALID_TEST_TYPE
-            );
+                    request.getType(), TestType.class, ErrorCode.INVALID_TEST_TYPE);
             existing.setType(testType);
         }
 
-
-        // Cập nhật các trường đơn lẻ; null sẽ bị bỏ qua theo cấu hình mapper
         testMapper.updateTestEntityFromRequest(request, existing);
 
-        // Auto-update slug if slug is empty
+        // Auto-update slug
         if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
-            // Generate slug from new name if provided, otherwise use existing name
-            String nameToUse = (request.getName() != null && !request.getName().trim().isEmpty()) 
-                    ? request.getName() 
+            String nameToUse = (request.getName() != null && !request.getName().trim().isEmpty())
+                    ? request.getName()
                     : existing.getName();
             if (nameToUse != null && !nameToUse.trim().isEmpty()) {
                 existing.setSlug(SlugHelper.toUniqueSlug(nameToUse));
             }
         } else {
-            // Normalize provided slug
             existing.setSlug(SlugHelper.toSlug(request.getSlug()));
         }
 
-        // Ngữ nghĩa:
-        // - partTestIds == null  -> KHÔNG thay đổi quan hệ parts
-        // - partTestIds isEmpty  -> XÓA toàn bộ liên kết parts
-        // - partTestIds có phần tử -> Gán đúng danh sách parts theo ids
+        // ============ Phase 2: bulk re-link parts (nếu có) ============
+        boolean reLinked = false;
         List<String> partIds = request.getPartTestIds();
         if (partIds != null) {
             Set<String> newIds = new HashSet<>(partIds);
 
-            if (existing.getPartTestEntities() == null) {
-                existing.setPartTestEntities(new ArrayList<>());
-            }
+            // TestEntity.update không validate tồn tại part (giữ semantics cũ:
+            // silent drop id không tồn tại). Nếu sau này muốn strict, thêm:
+            //   if (!newIds.isEmpty() && partTestRepository.countByIdIn(newIds) != newIds.size())
+            //       throw new AppException(ErrorCode.PART_TEST_NOT_FOUND);
 
-            // Gỡ các part không còn trong danh sách mới
-            List<PartTestEntity> current = new ArrayList<>(existing.getPartTestEntities());
-            for (PartTestEntity p : current) {
-                if (!newIds.contains(p.getId())) {
-                    p.setTestEntity(null);              // cập nhật phía sở hữu
-                    existing.getPartTestEntities().remove(p); // đồng bộ phía nghịch đảo
-                }
+            if (newIds.isEmpty()) {
+                partTestRepository.detachAllByTestId(testId);
+            } else {
+                partTestRepository.detachByTestIdExcluding(testId, newIds);
+                partTestRepository.attachToTest(testId, newIds);
             }
-
-            // Gắn các part theo danh sách mới (kể cả danh sách rỗng để clear)
-            List<PartTestEntity> newParts = partTestRepository.findAllById(newIds);
-            for (PartTestEntity p : newParts) {
-                if (p.getTestEntity() != existing) {
-                    p.setTestEntity(existing);          // phía sở hữu ManyToOne
-                }
-                if (!existing.getPartTestEntities().contains(p)) {
-                    existing.getPartTestEntities().add(p); // đồng bộ phía OneToMany
-                }
-            }
+            reLinked = true;
         }
 
-        TestEntity saved = testRepository.save(existing);
-        return testMapper.toTestResponse(saved);
+        // ============ Phase 3: response ============
+        TestEntity result = reLinked
+                ? testRepository.findById(testId)
+                .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND))
+                : testRepository.save(existing);
+
+        return testMapper.toTestResponse(result);
     }
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "test-details", key = "#testId"),
+            @CacheEvict(value = "tests-list", allEntries = true),
+            @CacheEvict(value = "tests-search", allEntries = true)
+    })
     public TestDetailResponse updateTestAudio(String testId, MultipartFile audio) {
         log.info("Updating audio for test: {}", testId);
 
@@ -253,7 +257,11 @@ public class TestServiceImpl implements ITestService {
     }
 
     @Override
-    @CacheEvict(value = {"test-details", "tests"}, key = "#testId")
+    @Caching(evict = {
+            @CacheEvict(value = "test-details", key = "#testId"),
+            @CacheEvict(value = "tests-list", allEntries = true),
+            @CacheEvict(value = "tests-search", allEntries = true)
+    })
     public void deleteTest(String testId) {
         log.info("Deleting test and invalidating cache: {}", testId);
         testRepository.deleteById(testId);
@@ -262,7 +270,10 @@ public class TestServiceImpl implements ITestService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "tests-list", key = "#page + ':' + #size")
     public PageResponse<TestSummaryResponse> getAllTests(int page, int size) {
+        log.info("Loading tests list from DB (cache miss): page={}, size={}", page, size);
+
         int pageNo = page > 0 ? page - 1 : 0;
         int pageSize = Math.min(size, 100);
         Sort sort = Sort.by(Sort.Direction.DESC, "createdDate");
@@ -285,8 +296,16 @@ public class TestServiceImpl implements ITestService {
 
 
 
-    @Transactional(readOnly = true)
     @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "tests-search",
+            key = "T(java.util.Objects).toString(#req.name) + '|' + " +
+                    "T(java.util.Objects).toString(#req.type) + '|' + " +
+                    "T(java.util.Objects).toString(#req.status) + '|' + " +
+                    "T(java.util.Objects).toString(#req.createdFrom) + '|' + " +
+                    "T(java.util.Objects).toString(#req.createdTo) + '|' + " +
+                    "#req.page + '|' + #req.size + '|' + " +
+                    "#pageable.sort.toString()")
     public PageResponse<TestSummaryResponse> searchTests(TestSearchRequest req, Pageable pageable) {
         int idx = Math.max(0, req.getPage() - 1);
         int size = Math.min(req.getSize(), 100);
@@ -298,12 +317,10 @@ public class TestServiceImpl implements ITestService {
                 TestSpecification.buildSpecification(req), pg);
         long t1 = System.nanoTime();
 
-        // Bulk count parts
-        var ids = page.getContent().stream().map(TestEntity::getId).toList();
-
         Map<String, Long> counts;
+        var ids = page.getContent().stream().map(TestEntity::getId).toList();
         if (ids.isEmpty()) {
-            counts = Collections.emptyMap(); // tránh gọi repo với []
+            counts = Collections.emptyMap();
         } else {
             counts = partTestRepository.countByTestIds(ids).stream()
                     .collect(Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
@@ -311,16 +328,16 @@ public class TestServiceImpl implements ITestService {
 
         var data = page.getContent().stream().map(e -> {
             var dto = testMapper.toTestSummary(e);
-            dto.setPartsCount(counts.getOrDefault(e.getId(),0L).intValue());
+            dto.setPartsCount(counts.getOrDefault(e.getId(), 0L).intValue());
             return dto;
         }).toList();
 
-        log.info("searchTests latency={}ms, page={}, size={}, total={}",
-                (t1-t0)/1_000_000, idx+1, size, page.getTotalElements());
+        log.info("searchTests latency={}ms (cache miss), page={}, size={}, total={}",
+                (t1 - t0) / 1_000_000, idx + 1, size, page.getTotalElements());
 
         return PageResponse.<TestSummaryResponse>builder()
                 .data(data)
-                .currentPage(idx+1)
+                .currentPage(idx + 1)
                 .pageSize(size)
                 .totalPages(page.getTotalPages())
                 .totalElements(page.getTotalElements())

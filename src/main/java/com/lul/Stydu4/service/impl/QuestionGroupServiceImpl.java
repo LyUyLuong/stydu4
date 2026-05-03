@@ -6,18 +6,12 @@ import com.lul.Stydu4.dto.request.QuestionGroup.QuestionGroupUpdateRequest;
 import com.lul.Stydu4.dto.response.PageResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupDetailResponse;
 import com.lul.Stydu4.dto.response.QuestionGroupResponse.QuestionGroupSummaryResponse;
-import com.lul.Stydu4.entity.FileEntity;
-import com.lul.Stydu4.entity.PartTestEntity;
-import com.lul.Stydu4.entity.QuestionGroupEntity;
-import com.lul.Stydu4.entity.QuestionTestEntity;
+import com.lul.Stydu4.entity.*;
 import com.lul.Stydu4.enums.ErrorCode;
 import com.lul.Stydu4.enums.FileType;
 import com.lul.Stydu4.exception.AppException;
 import com.lul.Stydu4.mapper.QuestionGroupMapper;
-import com.lul.Stydu4.repository.IFileRepository;
-import com.lul.Stydu4.repository.IPartTestRepository;
-import com.lul.Stydu4.repository.IQuestionGroupRepository;
-import com.lul.Stydu4.repository.IQuestionTestRepository;
+import com.lul.Stydu4.repository.*;
 import com.lul.Stydu4.repository.specification.QuestionGroupSpecification;
 import com.lul.Stydu4.service.IFileStorageService;
 import com.lul.Stydu4.service.IQuestionGroupService;
@@ -33,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +41,8 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     IQuestionGroupRepository questionGroupRepository;
     IPartTestRepository partTestRepository;
     IQuestionTestRepository questionTestRepository;
-    IFileRepository fileRepository;  // ✅ ADD THIS
+    IAnswerRepository answerRepository;
+    IFileRepository fileRepository;
     QuestionGroupMapper questionGroupMapper;
     IFileStorageService fileStorageService;
 
@@ -173,9 +171,29 @@ public class QuestionGroupServiceImpl implements IQuestionGroupService {
     public QuestionGroupDetailResponse getQuestionGroupById(String questionGroupId) {
         log.info("Fetching question group with id: {}", questionGroupId);
 
-        // ✅ Use optimized query to prevent N+1 problem
-        QuestionGroupEntity questionGroup = questionGroupRepository.findByIdWithDetails(questionGroupId)
+        // Q1: group + audio + image (1 row, 2 LEFT JOIN)
+        QuestionGroupEntity questionGroup = questionGroupRepository.findByIdWithMedia(questionGroupId)
                 .orElseThrow(() -> new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND));
+
+        // Q2: questions của group (kèm audio + image)
+        List<QuestionTestEntity> questions = questionTestRepository
+                .findByGroupIdsWithMedia(List.of(questionGroupId));
+
+        // Q3: answers cho các question đó
+        if (!questions.isEmpty()) {
+            List<String> qIds = questions.stream()
+                    .map(QuestionTestEntity::getId)
+                    .toList();
+
+            Map<String, List<AnswerEntity>> answersByQ = answerRepository.findByQuestionIds(qIds).stream()
+                    .collect(Collectors.groupingBy(a -> a.getQuestion().getId()));
+
+            questions.forEach(q -> q.setAnswers(
+                    new ArrayList<>(answersByQ.getOrDefault(q.getId(), List.of()))));
+        }
+
+        // Lắp ráp in-memory rồi map sang DTO
+        questionGroup.setQuestions(new ArrayList<>(questions));
 
         return questionGroupMapper.toQuestionGroupDetailResponse(questionGroup);
     }

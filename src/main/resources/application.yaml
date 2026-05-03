@@ -9,6 +9,17 @@ spring:
       host: localhost
       port: 6379
       database: 0
+    web:
+      pageable:
+        # ✅ NEW: chặn user gửi ?size=999999 đập sập DB
+        # Mọi controller dùng @ModelAttribute Pageable hoặc Pageable raw
+        # đều bị Spring Data tự cap về max-page-size này.
+        max-page-size: 100
+        default-page-size: 20
+        # FE đếm trang từ 1 cho thân thiện. Nếu để false (mặc định), Spring
+        # đọc ?page=0 là trang 1 → dễ off-by-one. Đặt true để khớp quy ước
+        # currentPage = pageNo + 1 mà service đang trả về.
+        one-indexed-parameters: true
   security:
     oauth2:
       client:

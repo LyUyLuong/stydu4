@@ -30,13 +30,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+
 import org.springframework.transaction.annotation.Transactional;
 
 
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.lul.Stydu4.util.EnumValidator.validateAndConvert;
@@ -83,70 +82,72 @@ public class PartTestServiceImpl implements IPartTestService {
         PartTestEntity existing = partTestRepository.findById(partTestID)
                 .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND));
 
-        // Update basic fields
+        // ============ Phase 1: simple field updates trên managed entity ============
         if (request.getName() != null && !request.getName().isBlank()) {
             existing.setName(request.getName());
         }
-
         if (request.getDescription() != null) {
             existing.setDescription(request.getDescription());
         }
-
         if (request.getType() != null) {
             PartType partType = validateAndConvert(
-                    request.getType(),
-                    PartType.class,
-                    ErrorCode.INVALID_PART_TYPE
-            );
+                    request.getType(), PartType.class, ErrorCode.INVALID_PART_TYPE);
             existing.setType(partType);
         }
-
-
-        if (request.getQuestionIds() != null) {
-            // ✅ Remove old relationships without deleting entities
-            List<QuestionTestEntity> currentQuestions = new ArrayList<>(existing.getQuestions());
-            currentQuestions.forEach(q -> q.setPartEntity(null));
-            existing.getQuestions().clear();
-
-            if (!request.getQuestionIds().isEmpty()) {
-                List<QuestionTestEntity> newQuestions = questionTestRepository
-                        .findAllById(request.getQuestionIds());
-
-                if (newQuestions.size() != request.getQuestionIds().size()) {
-                    throw new AppException(ErrorCode.QUESTION_NOT_FOUND);
-                }
-
-                newQuestions.forEach(existing::addQuestion);
-            }
-        }
-
-
-        if (request.getQuestionGroupsIds() != null ) {
-            // ✅ Remove old relationships without deleting entities
-            List<QuestionGroupEntity> currentGroups = new ArrayList<>(existing.getQuestionGroups());
-            currentGroups.forEach(g -> g.setPartEntity(null));
-            existing.getQuestionGroups().clear();
-
-            if (!request.getQuestionGroupsIds().isEmpty()) {
-                List<QuestionGroupEntity> newGroups = questionGroupRepository
-                        .findAllById(request.getQuestionGroupsIds());
-
-                if (newGroups.size() != request.getQuestionGroupsIds().size()) {
-                    throw new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND);
-                }
-
-                newGroups.forEach(existing::addQuestionGroup);
-            }
-        }
-
         if (request.getTestId() != null) {
             TestEntity test = testRepository.findById(request.getTestId())
                     .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
             existing.setTestEntity(test);
-        }   
+        }
 
-        PartTestEntity updated = partTestRepository.save(existing);
-        return partTestMapper.toPartTestResponse(updated);
+        // ============ Phase 2: bulk re-link bằng UPDATE phẳng ============
+        boolean reLinked = false;
+
+        if (request.getQuestionIds() != null) {
+            Set<String> newIds = new HashSet<>(request.getQuestionIds());
+
+            if (!newIds.isEmpty() &&
+                    questionTestRepository.countByIdIn(newIds) != newIds.size()) {
+                throw new AppException(ErrorCode.QUESTION_NOT_FOUND);
+            }
+
+            if (newIds.isEmpty()) {
+                // User xoá toàn bộ link → 1 UPDATE
+                questionTestRepository.detachAllByPartId(partTestID);
+            } else {
+                // Gỡ những câu KHÔNG còn trong list mới + Gắn list mới → 2 UPDATE
+                questionTestRepository.detachByPartIdExcluding(partTestID, newIds);
+                questionTestRepository.attachToPart(partTestID, newIds);
+            }
+            reLinked = true;
+        }
+
+        if (request.getQuestionGroupsIds() != null) {
+            Set<String> newIds = new HashSet<>(request.getQuestionGroupsIds());
+
+            if (!newIds.isEmpty() &&
+                    questionGroupRepository.countByIdIn(newIds) != newIds.size()) {
+                throw new AppException(ErrorCode.QUESTION_GROUP_NOT_FOUND);
+            }
+
+            if (newIds.isEmpty()) {
+                questionGroupRepository.detachAllByPartId(partTestID);
+            } else {
+                questionGroupRepository.detachByPartIdExcluding(partTestID, newIds);
+                questionGroupRepository.attachToPart(partTestID, newIds);
+            }
+            reLinked = true;
+        }
+
+        // ============ Phase 3: response ============
+        // Bulk UPDATE đã clear EntityManager → entity managed bị detach.
+        // Re-fetch để mapper đọc data mới (lazy load qua persistent context mới).
+        PartTestEntity result = reLinked
+                ? partTestRepository.findById(partTestID)
+                .orElseThrow(() -> new AppException(ErrorCode.PART_TEST_NOT_FOUND))
+                : partTestRepository.save(existing); // không re-link → save trực tiếp
+
+        return partTestMapper.toPartTestResponse(result);
     }
 
 
