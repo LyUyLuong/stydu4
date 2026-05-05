@@ -319,20 +319,15 @@ public class ExamServiceImpl implements IExamService {
 
     /**
      * Extract question number from question name
-     * Example: "Question 6 - Part 1" -> 6
-     * Example: "Question Group 68 - 70 - Part 3" -> 68
+     * Supports: "Q1", "Q32", "Question 6 - Part 1", "Question Group 68 - 70", "QG5"
      */
     private int extractQuestionNumber(String name) {
         if (name == null) {
             return Integer.MAX_VALUE; // Put null names at the end
         }
         
-        // Pattern matches "Question 123" or "Question Group 123"
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-            "question\\s+(?:group\\s+)?(\\d+)",
-            java.util.regex.Pattern.CASE_INSENSITIVE
-        );
-        java.util.regex.Matcher matcher = pattern.matcher(name);
+        // Extract the first number found in the name
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d+)").matcher(name);
         
         if (matcher.find()) {
             return Integer.parseInt(matcher.group(1));
