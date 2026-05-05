@@ -235,7 +235,10 @@ public class TestServiceImpl implements ITestService {
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
         TestDetailResponse testDetailResponse = testMapper.toTestResponse(test);
-        List<PartTestDetailResponse> partTestDetailRespons = test.getPartTestEntities().stream().map(partTestMapper::toPartTestResponse).toList();
+        List<PartTestDetailResponse> partTestDetailRespons = test.getPartTestEntities().stream()
+                .sorted((p1, p2) -> Integer.compare(extractPartNumber(p1.getName()), extractPartNumber(p2.getName())))
+                .map(partTestMapper::toPartTestResponse)
+                .toList();
         testDetailResponse.setParts(partTestDetailRespons);
 
         return testDetailResponse;
@@ -347,6 +350,13 @@ public class TestServiceImpl implements ITestService {
         return Sort.by(validOrders);
     }
 
-
+    /**
+     * Extract part number from part name (e.g. "Part 1 for Test 1" -> 1)
+     */
+    private int extractPartNumber(String name) {
+        if (name == null) return Integer.MAX_VALUE;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?i)part\\s+(\\d+)").matcher(name);
+        return m.find() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE;
+    }
 
 }
