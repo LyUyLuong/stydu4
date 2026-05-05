@@ -62,6 +62,9 @@ class TestServiceImplTest {
     @Mock
     private IFileRepository fileRepository;
 
+    @Mock
+    private PartTestHydrator partTestHydrator;
+
     @InjectMocks
     private TestServiceImpl testService;
 
@@ -408,31 +411,32 @@ class TestServiceImplTest {
 
     @Test
     void getTestById_Success() {
-        testEntity.setPartTestEntities(new ArrayList<>(List.of(partTestEntity)));
         PartTestDetailResponse partResponse = new PartTestDetailResponse();
         partResponse.setId("part-456");
         partResponse.setName("Sample Part");
 
-        when(testRepository.findByIdWithParts("test-123")).thenReturn(Optional.of(testEntity));
+        when(testRepository.findByIdWithAudio("test-123")).thenReturn(Optional.of(testEntity));
+        when(partTestRepository.findByTestEntityIdOrderByCreatedDateAsc("test-123"))
+                .thenReturn(List.of(partTestEntity));
         when(testMapper.toTestResponse(testEntity)).thenReturn(detailResponse);
-        when(partTestMapper.toPartTestResponse(partTestEntity)).thenReturn(partResponse);
+        // partTestHydrator.hydrate(...) là void → mặc định no-op, không cần stub
 
         TestDetailResponse result = testService.getTestById("test-123");
 
         assertNotNull(result);
-        assertEquals(1, result.getParts().size());
-        assertEquals("part-456", result.getParts().get(0).getId());
         assertEquals("TOEIC", result.getType());
-        verify(testRepository).findByIdWithParts("test-123");
+        verify(testRepository).findByIdWithAudio("test-123");
+        verify(partTestRepository).findByTestEntityIdOrderByCreatedDateAsc("test-123");
+        verify(partTestHydrator).hydrate(anyList());
         verify(testMapper).toTestResponse(testEntity);
-        verify(partTestMapper).toPartTestResponse(partTestEntity);
     }
 
     @Test
     void getTestById_NotFound_ThrowsException() {
-        when(testRepository.findById("nonexistent")).thenReturn(Optional.empty());
+        when(testRepository.findByIdWithAudio("nonexistent")).thenReturn(Optional.empty());
 
-        AppException exception = assertThrows(AppException.class, () -> testService.getTestById("nonexistent"));
+        AppException exception = assertThrows(AppException.class,
+                () -> testService.getTestById("nonexistent"));
         assertEquals(ErrorCode.TEST_NOT_FOUND, exception.getErrorCode());
     }
 

@@ -242,9 +242,12 @@ public class TestServiceImpl implements ITestService {
         TestEntity test = testRepository.findByIdWithAudio(testId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEST_NOT_FOUND));
 
-        // Q2: parts của test (phẳng, không nested)
+        // Q2: parts của test (phẳng, không nested) — sorted by part number
         List<PartTestEntity> parts =
                 partTestRepository.findByTestEntityIdOrderByCreatedDateAsc(testId);
+
+        // Sort parts by part number (e.g. "Part 1", "Part 2", ...)
+        parts.sort((p1, p2) -> Integer.compare(extractPartNumber(p1.getName()), extractPartNumber(p2.getName())));
 
         if (!parts.isEmpty()) {
             // Q3-Q6: hydrate parts (questions + groups + answers) trong 4 query phẳng
@@ -377,6 +380,13 @@ public class TestServiceImpl implements ITestService {
         return Sort.by(validOrders);
     }
 
-
+    /**
+     * Extract part number from part name (e.g. "Part 1 for Test 1" -> 1)
+     */
+    private int extractPartNumber(String name) {
+        if (name == null) return Integer.MAX_VALUE;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?i)part\\s+(\\d+)").matcher(name);
+        return m.find() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE;
+    }
 
 }

@@ -757,26 +757,33 @@ public class ExamServiceImpl implements IExamService {
                         (existing, replacement) -> existing // In case of duplicates, keep existing
                 ));
 
-        // Get all parts that were completed
+        // Get all parts that were completed (sorted by part number)
         List<PartTestEntity> completedParts = result.getResultHaveParts().stream()
                 .map(ResultHavePartsEntity::getPartTest)
+                .sorted((p1, p2) -> Integer.compare(extractPartNumber(p1.getName()), extractPartNumber(p2.getName())))
                 .collect(Collectors.toList());
 
-        // Get all questions from completed parts
+        // Get all questions from completed parts (sorted by question number within each part)
         List<QuestionTestEntity> allQuestions = new ArrayList<>();
         for (PartTestEntity part : completedParts) {
-            // Get direct questions in part
+            // Get direct questions in part (sorted)
             if (part.getQuestions() != null) {
-                allQuestions.addAll(part.getQuestions());
+                part.getQuestions().stream()
+                        .sorted((q1, q2) -> Integer.compare(extractQuestionNumber(q1.getName()), extractQuestionNumber(q2.getName())))
+                        .forEach(allQuestions::add);
             }
             
-            // Get questions from question groups in part
+            // Get questions from question groups in part (groups sorted, questions within sorted)
             if (part.getQuestionGroups() != null) {
-                for (QuestionGroupEntity group : part.getQuestionGroups()) {
-                    if (group.getQuestions() != null) {
-                        allQuestions.addAll(group.getQuestions());
-                    }
-                }
+                part.getQuestionGroups().stream()
+                        .sorted((g1, g2) -> Integer.compare(extractQuestionNumber(g1.getName()), extractQuestionNumber(g2.getName())))
+                        .forEach(group -> {
+                            if (group.getQuestions() != null) {
+                                group.getQuestions().stream()
+                                        .sorted((q1, q2) -> Integer.compare(extractQuestionNumber(q1.getName()), extractQuestionNumber(q2.getName())))
+                                        .forEach(allQuestions::add);
+                            }
+                        });
             }
         }
 
@@ -869,6 +876,9 @@ public class ExamServiceImpl implements IExamService {
 
     private List<PartResultDetail> mapToPartResults(List<ResultHavePartsEntity> resultHaveParts) {
         return resultHaveParts.stream()
+                .sorted((r1, r2) -> Integer.compare(
+                        extractPartNumber(r1.getPartTest().getName()),
+                        extractPartNumber(r2.getPartTest().getName())))
                 .map(rhp -> PartResultDetail.builder()
                         .partId(rhp.getPartTest().getId())
                         .partName(rhp.getPartTest().getName())
