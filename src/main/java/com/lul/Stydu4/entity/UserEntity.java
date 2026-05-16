@@ -56,4 +56,7 @@ public class UserEntity extends BaseEntity{
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<ResultEntity> results;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
 }

@@ -19,9 +19,7 @@
 -- =========================================================================
 
 -- ⚠️ Khi chạy trên prod nhớ chọn đúng database trước:
- USE db_stydu4;
 -- Khi chạy local:
--- USE stydu5;
 
 -- PartTest: phục vụ findByTestEntityIdOrderByCreatedDateAsc
 -- (WHERE test_id=? ORDER BY created_date) → composite này loại bỏ filesort.

@@ -1,0 +1,1 @@
+ALTER TABLE user_entity ADD COLUMN avatar_url VARCHAR(500) DEFAULT NULL;
